@@ -10,6 +10,7 @@ CREATE TABLE players (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     handicap INT NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'PLAYER',
     team_id INT REFERENCES teams(id)
 );
 
@@ -23,7 +24,6 @@ CREATE TABLE tournaments (
 -- MATCH TABLE
 CREATE TABLE matches (
     id SERIAL PRIMARY KEY,
-    tournament_id INT REFERENCES tournaments(id),
     date DATE NOT NULL
 );
 

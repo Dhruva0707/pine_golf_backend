@@ -14,9 +14,9 @@ Its core features include:
         (e.g., points for top finishers, most birdies, and nearest to the pin).
     * Supports both manual entry of top performers and automated result generation from individual player scores.
 
-* **Match and Score Recording:**
-    * Create and manage individual matches with unique identifiers.
-    * Enter and track scores for each player per match.
+* **Flight and Score Recording:**
+    * Create and manage individual flight with unique identifiers.
+    * Enter and track scores for each player per flight.
 
 * **Season-Long Performance & Analytics:**
     * Aggregate team points across all tournaments to determine real-time standings.
@@ -25,7 +25,7 @@ Its core features include:
 
 ## Documentations
 ### 🗄️Database
-https://github.com/Dhruva0707/pine_golf_backend/blob/main/docs/database.md
+https://github.com/Dhruva0707/pine_golf_backend/blob/main/db/README.md
 ### ⚙️ Backend
 https://github.com/Dhruva0707/pine_golf_backend/blob/main/README.md
 ### 🖥️ Frontend
