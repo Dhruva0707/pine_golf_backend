@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.pinewoods"
-version = "0.0.1-SNAPSHOT"
+version = "1.0.0"
 description = "Demo project for Spring Boot"
 
 java {
@@ -25,9 +25,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.liquibase:liquibase-core")
-	implementation("org.springframework:spring-jdbc")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
-	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly("org.postgresql:r2dbc-postgresql")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("io.projectreactor:reactor-test")

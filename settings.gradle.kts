@@ -1,1 +1,1 @@
-rootProject.name = "score.tracker"
+rootProject.name = "pinewoods golf backend"
