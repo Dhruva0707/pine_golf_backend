@@ -15,6 +15,7 @@ public class Player {
     private Long id;
 
     @NotBlank(message = "name is required")
+    @Column(nullable = false, unique = true)
     private String name;
 
     @NotBlank(message = "password is required")
@@ -32,7 +33,7 @@ public class Player {
     // --- Constructors ---
     public Player() {}
 
-    public Player(String name, String password, Integer handicap, Role role, Team team) {
+    public Player(Long id, String name, String password, Integer handicap, Role role, Team team) {
         this.name = name;
         this.password = password;
         this.handicap = handicap;
@@ -40,9 +41,8 @@ public class Player {
         this.team = team;
     }
 
-    public Player(String name, String password) {
-        var team = new Team(); // TODO modify to use unassigned team
-        new Player(name, password, 36, Role.PLAYER, team);
+    public Player(String name, String password, Integer handicap, Role role, Team team) {
+        this(null, name, password, handicap, role, team);
     }
 
     // --- Getters and Setters ---

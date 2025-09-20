@@ -1,14 +1,14 @@
 -- TEAM TABLE
 CREATE TABLE teams (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    season_year INT NOT NULL
+    name VARCHAR(100) NOT NULL
 );
 
 -- PLAYER TABLE
 CREATE TABLE players (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    password VARCHAR(100) NOT NULL,
     handicap INT NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'PLAYER',
     team_id INT REFERENCES teams(id)
@@ -62,3 +62,11 @@ CREATE TABLE handicap_history (
     old_handicap INT,
     new_handicap INT
 );
+
+-- Insert the admin entry
+INSERT INTO players (name, password, role, handicap)
+VALUES ('pinewoods_admin', '$2a$10$jivffkWyc/IG7APi2HdPgeW3lsYEJT7n9ydQO2I6g3YIvu44OZ5z.', 'ADMIN', 0);
+
+-- Insert the default team
+INSERT INTO teams (name)
+VALUES ('UNASSIGNED')

@@ -25,8 +25,13 @@ public class Team {
     //--- Constructors ---
     public Team() {}
 
-    public Team(String name) {
+    public Team(Long id, String name) {
+        this.id = id;
         this.name = name;
+    }
+
+    public Team(String name) {
+        this(null, name);
     }
 
     // --- Getters and Setters
