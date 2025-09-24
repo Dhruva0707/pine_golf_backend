@@ -1,64 +1,59 @@
 -- TEAM TABLE
 CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    season_year INT NOT NULL
+   id BIGSERIAL PRIMARY KEY,
+   name VARCHAR(100) NOT NULL UNIQUE
 );
 
 -- PLAYER TABLE
 CREATE TABLE players (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    handicap INT NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'PLAYER',
-    team_id INT REFERENCES teams(id)
+   id BIGSERIAL PRIMARY KEY,
+   name VARCHAR(100) NOT NULL UNIQUE,
+   password VARCHAR(255) NOT NULL,
+   handicap DOUBLE PRECISION,
+   role VARCHAR(50) NOT NULL,
+   team_id BIGINT REFERENCES teams(id)
+);
+
+-- FLIGHT TABLE
+CREATE TABLE flights (
+   id BIGSERIAL PRIMARY KEY,
+   date DATE NOT NULL
 );
 
 -- TOURNAMENT TABLE
 CREATE TABLE tournaments (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    date DATE NOT NULL
+   id BIGSERIAL PRIMARY KEY,
+   name VARCHAR(100) NOT NULL,
+   flight_id BIGINT REFERENCES flights(id),
+   winner_player_id BIGINT REFERENCES players(id),
+   runner_player_id BIGINT REFERENCES players(id)
 );
 
--- MATCH TABLE
-CREATE TABLE matches (
-    id SERIAL PRIMARY KEY,
-    date DATE NOT NULL
+-- FLIGHT SCORES TABLE
+CREATE TABLE flight_scores (
+   id BIGSERIAL PRIMARY KEY,
+   player_id BIGINT REFERENCES players(id),
+   flight_id BIGINT REFERENCES flights(id),
+   score INT
 );
 
--- PLAYER MATCH SCORES
-CREATE TABLE match_scores (
-    id SERIAL PRIMARY KEY,
-    match_id INT REFERENCES matches(id),
-    player_id INT REFERENCES players(id),
-    score INT NOT NULL
+-- SEASON TABLE
+CREATE TABLE seasons (
+   id BIGSERIAL PRIMARY KEY,
+   start_date DATE NOT NULL,
+   end_date DATE
 );
 
--- TOURNAMENT RESULTS
-CREATE TABLE tournament_results (
-    id SERIAL PRIMARY KEY,
-    tournament_id INT REFERENCES tournaments(id),
-    player_id INT REFERENCES players(id),
-    position INT, -- 1 = Winner, 2 = Runner-up, 3 = Third
-    stableford_points INT NOT NULL,
-    birdies INT DEFAULT 0,
-    nearest_to_pin BOOLEAN DEFAULT FALSE
+-- SEASON SCORES TABLE
+CREATE TABLE season_scores (
+   id BIGSERIAL PRIMARY KEY,
+   season_id BIGINT REFERENCES seasons(id),
+   team_id BIGINT REFERENCES teams(id),
+   score INT
 );
 
--- TEAM PERFORMANCE TRACKING
-CREATE TABLE team_points (
-    id SERIAL PRIMARY KEY,
-    team_id INT REFERENCES teams(id),
-    tournament_id INT REFERENCES tournaments(id),
-    total_points INT NOT NULL
-);
-
--- HANDICAP HISTORY (OPTIONAL)
-CREATE TABLE handicap_history (
-    id SERIAL PRIMARY KEY,
-    player_id INT REFERENCES players(id),
-    season_year INT NOT NULL,
-    old_handicap INT,
-    new_handicap INT
+-- WINNERS TABLE
+CREATE TABLE winners (
+   id BIGSERIAL PRIMARY KEY,
+   player_id BIGINT REFERENCES players(id)
 );
