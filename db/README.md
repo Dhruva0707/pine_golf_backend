@@ -27,3 +27,7 @@
   `psql -U <golfAdmin> -d <golf_database> -f db/setup_tables.sql`
 - Run the add_initial_data.sql script:  
   `psql -U <golfAdmin> -d <golf_database> -f db/add_initial_data.sql`
+Update the application.properties file with the database connection details.
+
+NOTE: if you wish to also work on this project, you might want to create a test sandbox database.
+Update the application-test.properties file with the test database connection details.
