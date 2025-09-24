@@ -7,10 +7,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 @Entity
+@Table(name = "teams")
 public class Team {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
@@ -20,7 +22,7 @@ public class Team {
     @Column(unique = true)
     private String name;
 
-    @OneToMany(fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "team", fetch = FetchType.LAZY)
     private List<Player> players;
 
     // Constructors

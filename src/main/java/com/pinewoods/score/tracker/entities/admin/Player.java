@@ -2,6 +2,7 @@ package com.pinewoods.score.tracker.entities.admin;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -28,10 +29,10 @@ public class Player {
     private String password;
 
     @NotNull
-    int handicap;
+    private double handicap;
 
     @NotNull
-    @Enumerated
+    @Enumerated(EnumType.STRING)
     Role role;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,7 +42,7 @@ public class Player {
     // Constructors
     public Player() {}
 
-    public Player(String name, String password, int handicap, Role role, Team team) {
+    public Player(String name, String password, double handicap, Role role, Team team) {
         this.name = name;
         this.handicap = handicap;
         this.role = role;
@@ -71,15 +72,15 @@ public class Player {
         return password;
     }
 
-    public void setPassword(String name) {
+    public void setPassword(String password) {
         this.password = password;
     }
 
-    public int getHandicap() {
+    public double getHandicap() {
         return handicap;
     }
 
-    public void setHandicap(int handicap) {
+    public void setHandicap(double handicap) {
         this.handicap = handicap;
     }
 

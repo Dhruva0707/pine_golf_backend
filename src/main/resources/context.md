@@ -32,7 +32,8 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
 
 ---
 
-## Entities
+## Entities (package: `com.pinewoods.score.tracker.entities`)
+### Admin entities (package: `com.pinewoods.score.tracker.entities.admin`)
 1. **Player**:
    - Attributes: `id`, `name`, `password`, `role`, `handicap`, `team`.
    - Relationships: Many-to-One with `Team`.
@@ -45,7 +46,8 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
 
 ---
 
-## DTOs
+## DTOs (package: `com.pinewoods.score.tracker.dtos`)
+### Admin DTOs (package: `com.pinewoods.score.tracker.dtos.admin`)
 1. **PlayerDTO**:
    - Contains: `name`, `handicap`, `teamName`.
    - **Purpose**: Simplifies data transfer for `Player` entities.
@@ -56,7 +58,8 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
 
 ---
 
-## Services
+## Services (package: `com.pinewoods.score.tracker.services`)
+### Admin Services (package: `com.pinewoods.score.tracker.services.admin`)
 1. **PlayerService**:
    - Handles player creation, retrieval, updates (e.g., password changes), and deletion.
    - Includes team assignment for players.
@@ -68,15 +71,16 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
 
 ---
 
-## Controllers
+## Controllers (package: `com.pinewoods.score.tracker.controllers`)
+### Admin Controllers (package: `com.pinewoods.score.tracker.controllers.admin`)
 1. **PlayerController**:
    - Endpoints:
       - `POST /players`: Create a new player.
       - `GET /players`: Retrieve all players.
       - `GET /players/{name}`: Retrieve a player by name.
-      - `PUT /players/{username}/password`: Change a player's password.
-      - `PUT /players/{username}/{handicap}`: Update a player's handicap.
-      - `PUT /players/{username}/team/{teamName}`: Assign a player to a team.
+      - `PUT /players/{name}/password`: Change a player's password. Use a String body with the new raw password.
+      - `PUT /players/{name}/handicap`: Update a player's handicap. Use an Int body with the new handicap
+      - `PUT /players/{name}/team`: Assign a player to a team. Use a String body with the team name.
       - `DELETE /players/{name}`: Delete a player.
    - **Purpose**: Manages player-related operations.
 
@@ -90,7 +94,7 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
 
 ---
 
-## Security
+## Security (package: `com.pinewoods.score.tracker.config`)
 - **Spring Security**:
    - Uses method-level security annotations (e.g., `@PreAuthorize`).
    - Passwords are hashed using `BCryptPasswordEncoder`.
@@ -99,8 +103,14 @@ The **Golf Club Tracker** is a Spring Boot application designed to manage and au
    - Players: Limited access to view and update their own data.
 
 ---
+## Exception handling (package: `com.pinewoods.score.tracker.exceptions`)
+- Custom exception for entity conflicts
+- Custom exception for entity not found
+- Global exception handler to manage and format error responses
 
-## Database
+---
+
+## Database (location: db)
 - **Player** table:
    - Stores player details.
    - Relationships: Many-to-One with `Team`.

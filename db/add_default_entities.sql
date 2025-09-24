@@ -1,7 +1,8 @@
--- Insert the admin entry
-INSERT INTO players (name, password, role, handicap)
-VALUES ('pinewoods_admin', '$2a$12$c1mPnwk0n5mgybg8keKPKegjUcM9VfeJ.5/RvOTdO1zdg7Zj2eTIW', 'ADMIN', 0);
-
--- Insert the default team
+-- Create a default team
 INSERT INTO teams (name)
-VALUES ('UNASSIGNED')
+VALUES ('UNASSIGNED');
+
+-- Insert the admin entry
+INSERT INTO players (name, password, role, handicap, team_id)
+VALUES ('pinewoods_admin', '$2a$12$aRL6oTTPRkcc1WHv0ZjdB.4kht7C5CX4/JV6XbIrFfK1gwzvt0tqO', 'ADMIN', 0.0, 1);
+-- default password is 'P!neWo0d$'

@@ -4,28 +4,26 @@
 
 ### 🧍 Player & Team Management
 
-- `Player`: Stores player info like name, ID, password (hashed), and handicap
-- `Team`: Represents teams per season
-- `PlayerTeamAssignment`: Links players to teams per season *(can be derived from `team_id` in `players` if 1:1)*
+- `Player`: id, name (unique), password, handicap, role, team_id (FK to Team)
+- `Team`: id, name (unique)
 
 ### 🏆 Tournament & Flight Tracking
 
-- `Tournament`: Represents a tournament event
-- `Flight`: Represents a group of players competing on a specific date
-- `FlightPlayer`: Join table linking players to flights
-- `FlightScore`: Player’s performance in a flight
-- `TournamentResult`: Final rankings and points
-- `TeamScore`: Points earned by a team
+- `Tournament`: id, name, flight_id (FK to Flight), winner_player_id (FK to Player), runner_player_id (FK to Player)
+- `Flight`: id, date (not null)
+- `FlightScore`: id, player_id (FK to Player), flight_id (FK to Flight)
 
 ### 📊 Season Summary
 
-- `HandicapHistory`: Tracks handicap changes across seasons
-- `TeamPoints`: Aggregates team performance per tournament
+- `Season`: id, start_date (not null), end_date
+- `SeasonScore`: id, season_id (FK to Season), team_id (FK to Team)
+- `Winner`: id, player_id (FK to Player)
+
 ## Setup Database
-- Install postgres: https://www.postgresql.org/download/ This will also give you PGAdmin with which you can:
-  - add/create database users
-  - add/create/drop database
-- Create the admin user (super User) <golfAdmin>
-- Create the database and make the golfAdmin user its admin <golf_database>
-- Run the setup_tables.sql script: </br>
+- Install postgres: https://www.postgresql.org/download/
+- Create the admin user (super User) `<golfAdmin>`
+- Create the database and make the golfAdmin user its admin `<golf_database>`
+- Run the setup_tables.sql script:  
   `psql -U <golfAdmin> -d <golf_database> -f db/setup_tables.sql`
+- Run the add_initial_data.sql script:  
+  `psql -U <golfAdmin> -d <golf_database> -f db/add_initial_data.sql`

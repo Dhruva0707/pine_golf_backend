@@ -21,8 +21,8 @@ This document provides the context and guidelines for writing test cases for the
 5. **Parallel Execution**:
     - Tests should be written to support parallel execution. Avoid shared mutable state and ensure that each test is independent of others.
 
-6. **WebClient for HTTP Requests**:
-    - Use `WebClient` to perform HTTP requests in tests instead of `MockMvc`. This provides a more realistic simulation of client-server communication.
+6. **RestClient for HTTP Requests**:
+    - Use `RestClient` to perform HTTP requests in tests instead of `MockMvc`. This provides a more realistic simulation of client-server communication.
 
 7. **Test Naming**:
     - naming conventions should be concise, clear and consistent:
