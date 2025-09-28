@@ -2,14 +2,23 @@ package com.pinewoods.score.tracker.services.admin;
 
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.admin.TeamRepository;
+import com.pinewoods.score.tracker.dao.flight.FlightScoreRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.admin.Role;
 import com.pinewoods.score.tracker.entities.admin.Team;
+import com.pinewoods.score.tracker.entities.flight.Flight;
+import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import com.pinewoods.score.tracker.services.flight.FlightService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,11 +34,15 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final TeamRepository teamRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final FlightScoreRepository flightScoreRepository;
 
-    public PlayerService(PlayerRepository playerRepository, TeamRepository teamRepository, BCryptPasswordEncoder passwordEncoder) {
+    public PlayerService(PlayerRepository playerRepository, TeamRepository teamRepository,
+                         FlightScoreRepository flightScoreRepository,
+                         BCryptPasswordEncoder passwordEncoder) {
         this.playerRepository = playerRepository;
         this.teamRepository = teamRepository;
         this.passwordEncoder = passwordEncoder;
+        this.flightScoreRepository = flightScoreRepository;
     }
 
     // ----------- Create Player -----------
@@ -58,7 +71,14 @@ public class PlayerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Team with name " + teamNameInternal + " does not exist."));
 
         String encodedPassword = passwordEncoder.encode(rawPassword);
-        Player player = new Player(name, encodedPassword, handicap, Role.PLAYER, team);
+        Player player = Player.builder()
+                .name(name)
+                .password(encodedPassword)
+                .role(Role.PLAYER)
+                .handicap(handicap)
+                .team(team)
+                .build();
+
         playerRepository.save(player);
 
         return createPlayerDTO(player);
@@ -92,6 +112,26 @@ public class PlayerService {
     public List<PlayerDTO> getAllPlayers() {
         return playerRepository.findAll().stream()
                 .map(PlayerService::createPlayerDTO)
+                .toList();
+    }
+
+    /**
+     * Retrieves all the flights for a player.
+     * Along with the scores of the other players in the flight.
+     *
+     * @param playerName name of the player to retrieve flights for
+     * @return List of FlightDTO representing all flights for the player
+     */
+    public List<FlightDTO> getPlayerFlights(String playerName) {
+        Player player = playerRepository.findByName(playerName)
+                .orElseThrow(() -> new ResourceNotFoundException("Player with name " + playerName + " does not exist."));
+
+        List<Flight> flights = player.getFlightScores().stream()
+                .map(FlightScore::getFlight)
+                .toList();
+
+        return flights.stream()
+                .map(FlightService::createDTO)
                 .toList();
     }
 

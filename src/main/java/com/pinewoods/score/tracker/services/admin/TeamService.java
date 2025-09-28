@@ -37,7 +37,11 @@ public class TeamService {
         if (teamRepository.existsByName(name)) {
             throw new ResourceConflictException("Team with name " + name + " already exists.");
         }
-        var team = new Team(name);
+
+        Team team = Team.builder()
+                .name(name)
+                .build();
+
         teamRepository.save(team);
 
         return createTeamDTO(team);
@@ -80,7 +84,7 @@ public class TeamService {
      * @param currentName current name of the team
      * @param newName new name for the team
      * @return Updated TeamDTO
-     * @throws ResourceNotFoundException if the team does not exist or if a team with the new name already exists
+     * @throws ResourceNotFoundException if the team does not exist, or if a team with the new name already exists
      */
     @PreAuthorize("hasRole('ADMIN')")
     public TeamDTO updateTeamName(String currentName, String newName) {
