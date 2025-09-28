@@ -2,6 +2,7 @@ package com.pinewoods.score.tracker.controllers.admin;
 
 import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtilities;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.services.admin.PlayerService;
 import java.net.URI;
 import java.util.List;
@@ -50,6 +51,12 @@ public class PlayerController {
     @GetMapping
     public ResponseEntity<List<PlayerDTO>> getAllPlayers() {
         List<PlayerDTO> result = playerService.getAllPlayers();
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{name}/flights")
+    public ResponseEntity<List<FlightDTO>> getAllFlights(@PathVariable String name) {
+        List<FlightDTO> result = playerService.getPlayerFlights(name);
         return ResponseEntity.ok(result);
     }
 

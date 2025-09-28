@@ -17,7 +17,7 @@ CREATE TABLE players (
 -- FLIGHT TABLE
 CREATE TABLE flights (
    id BIGSERIAL PRIMARY KEY,
-   date DATE NOT NULL
+   date TIMESTAMP NOT NULL
 );
 
 -- TOURNAMENT TABLE
@@ -26,7 +26,8 @@ CREATE TABLE tournaments (
    name VARCHAR(100) NOT NULL,
    flight_id BIGINT REFERENCES flights(id),
    winner_player_id BIGINT REFERENCES players(id),
-   runner_player_id BIGINT REFERENCES players(id)
+   runner_player_id BIGINT REFERENCES players(id),
+   closest_to_pin_player_id BIGINT REFERENCES players(id)
 );
 
 -- FLIGHT SCORES TABLE
@@ -34,7 +35,8 @@ CREATE TABLE flight_scores (
    id BIGSERIAL PRIMARY KEY,
    player_id BIGINT REFERENCES players(id),
    flight_id BIGINT REFERENCES flights(id),
-   score INT
+   score INT,
+   birdies INT
 );
 
 -- SEASON TABLE
