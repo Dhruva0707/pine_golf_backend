@@ -13,6 +13,43 @@ import org.springframework.web.client.RestClient;
 
 public class HttpUtilities {
 
+    private static final String BEARER = "Bearer ";
+
+    public static ResponseEntity<String> sendRequest(String path, String body, String token, HttpMethod method,
+                                                     RestClient restClient) {
+        String authHeader = BEARER + token;
+        // Create a generic request builder that can handle any HTTP method
+        RestClient.RequestHeadersSpec<?> requestSpec;
+        if (method.equals(HttpMethod.POST)) {
+            requestSpec = restClient.post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body);
+        } else if (method.equals(HttpMethod.PUT)) {
+            requestSpec = restClient.put().uri(path).contentType(MediaType.APPLICATION_JSON).body(body);
+        } else if (method.equals(HttpMethod.GET)) {
+            requestSpec = restClient.get().uri(path);
+        } else if (method.equals(HttpMethod.DELETE)) {
+            requestSpec = restClient.delete().uri(path);
+        } else {
+            throw new IllegalArgumentException("Unsupported HTTP method: " + method);
+        }
+
+//        return requestSpec
+//                .header(HttpHeaders.AUTHORIZATION, authHeader)
+//                .retrieve()
+//                .toEntity(String.class);
+
+        return requestSpec
+                .header(HttpHeaders.AUTHORIZATION, authHeader)
+                .exchange((req, res) -> {
+                    // ✅ Correct way to consume body
+                    String responseBody = res.bodyTo(String.class);
+                    return ResponseEntity
+                            .status(res.getStatusCode())
+                            .headers(res.getHeaders())
+                            .body(responseBody);
+                });
+
+    }
+
     // Utility method to send HTTP requests
     public static ResponseEntity<String> sendRequest(String path, String jsonBody, String username, String password,
         HttpMethod method, RestClient restClient) {

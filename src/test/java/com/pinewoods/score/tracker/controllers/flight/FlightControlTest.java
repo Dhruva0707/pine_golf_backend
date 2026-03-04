@@ -1,7 +1,9 @@
 package com.pinewoods.score.tracker.controllers.flight;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pinewoods.score.tracker.dto.admin.AuthenticationDTOs;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -91,16 +94,18 @@ public class FlightControlTest {
 
     @Test
     public void create_flight_success_admin() throws Exception {
+        String adminToken = loginAndGetToken(adminUsername, adminPassword);
         String flightScores = "[" +
                 "{\"playerName\":\"player2\",\"score\":36, \"birdies\": 2}," +
                 "{\"playerName\":\"player1\",\"score\":32}" +
                 "]";
 
-        ResponseEntity<String> flightAdditionResponse = sendRequest(flightPath, flightScores, adminUsername, adminPassword,
+        ResponseEntity<String> flightAdditionResponse = sendRequest(flightPath, flightScores, adminToken,
                 HttpMethod.POST, restClient);
 
+        String player2Token = loginAndGetToken(player2Username, playerPassword);
         String playerFlightPath = playerPath + "/player2/flights";
-        ResponseEntity<String> playerResponse = sendRequest(playerFlightPath, null, player2Username, playerPassword,
+        ResponseEntity<String> playerResponse = sendRequest(playerFlightPath, null, player2Token,
                 HttpMethod.GET, restClient);
 
         // Deserialize creation response
@@ -144,14 +149,34 @@ public class FlightControlTest {
 
     @Test
     public void create_flight_failure_inValidPlayer() throws Exception {
+        String token = loginAndGetToken(player1Username, playerPassword);
         String flightScores = "[" +
                 "{\"playerName\":\"player2\",\"score\":80}" +
                 "]";
 
-        ResponseEntity<String> response = sendRequest(flightPath, flightScores, player1Username, playerPassword,
+        ResponseEntity<String> response = sendRequest(flightPath, flightScores, token,
                 HttpMethod.POST, restClient);
 
         assertNotNull(response);
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    /********************************** Utilities **********************************/
+    private String loginAndGetToken(String username, String password) throws JsonProcessingException {
+        String loginJson = objectMapper.writeValueAsString(new AuthenticationDTOs.AuthRequestDTO(username, password));
+
+        ResponseEntity<String> response = restClient.post()
+                .uri("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(loginJson)
+                .retrieve()
+                .toEntity(String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+
+        AuthenticationDTOs.AuthResponseDTO authResponse = objectMapper.readValue(response.getBody(),
+                AuthenticationDTOs.AuthResponseDTO.class);
+        return authResponse.token();
+
     }
 }
