@@ -127,6 +127,12 @@ public class TournamentService {
                 .toList();
     }
 
+    // ================ Delete Tournament ======================
+    @PreAuthorize( "hasRole('ADMIN')")
+    public void deleteTournament(Long tournamentId) {
+        tournamentRepo.deleteById(tournamentId);
+    }
+
     // ============= Utilities =============
     private void calculateFinalAwards(Tournament tournament) {
         List<FlightScore> leaderboard = tournament.getFlights().stream()

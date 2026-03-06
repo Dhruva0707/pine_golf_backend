@@ -23,9 +23,9 @@ public class Season {
     @Column(unique = true)
     private String name;
 
-    @OneToMany(mappedBy = "season", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "season", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Tournament> tournaments = new ArrayList<>();
 
-    @OneToMany(mappedBy = "season", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "season", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TeamStanding> standings = new ArrayList<>();
 }

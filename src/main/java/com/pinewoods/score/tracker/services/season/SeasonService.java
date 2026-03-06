@@ -78,6 +78,13 @@ public class SeasonService {
                 .toList();
     }
 
+    //=================== Delete Season ======================
+    public void deleteSeason(String seasonName) {
+        Season season = seasonRepo.findByName(seasonName)
+                .orElseThrow(() -> new RuntimeException("Season not found"));
+        seasonRepo.delete(season);
+    }
+
 
     /**************** Converters  ****************/
     private SeasonDTO toDTO(Season season) {

@@ -24,6 +24,6 @@ public class Flight {
     @NotNull
     private Date date;
 
-    @OneToMany(mappedBy = "flight", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "flight", fetch = FetchType.EAGER, orphanRemoval = true)
     private List<FlightScore> flightScores;
 }
