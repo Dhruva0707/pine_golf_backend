@@ -27,12 +27,10 @@ A Spring Boot application designed to manage and track golf tournaments, matches
 ### 📊 Season Summary & Handicap Adjustment
 - Aggregate team points across tournaments.
 - Identify the top-performing team at season end.
-- Calculate performance differentials to adjust player handicaps.
 
 ## 🚀 MVP Goals
 - Add tournament entries manually or auto-fill from player scores.
 - Track individual and team performance throughout the season.
-- Generate season-end summaries and handicap updates.
 
 ---
 

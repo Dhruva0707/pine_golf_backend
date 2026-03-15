@@ -15,6 +15,16 @@ public class HttpUtilities {
 
     private static final String BEARER = "Bearer ";
 
+    /**
+     * Utility method to send HTTP requests
+     *
+     * @param path path of the request
+     * @param body body as a string
+     * @param token token
+     * @param method http method
+     * @param restClient client
+     * @return responseEntity
+     */
     public static ResponseEntity<String> sendRequest(String path, String body, String token, HttpMethod method,
                                                      RestClient restClient) {
         String authHeader = BEARER + token;

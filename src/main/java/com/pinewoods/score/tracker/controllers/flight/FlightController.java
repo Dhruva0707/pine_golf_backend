@@ -47,7 +47,7 @@ public class FlightController {
         Flight createdFlight = flightService.createFlight(scores);
         URI resourceUri = ControllerUtilities.createResourceURI("id", createdFlight.getId());
         return ResponseEntity.created(resourceUri)
-                .body(FlightService.createDTO(createdFlight));
+                .body(createdFlight.toDTO());
     }
 
     // ---------- Read Flight --------------
@@ -64,6 +64,6 @@ public class FlightController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<FlightDTO> getFlight(@PathVariable long id) {
-        return ResponseEntity.ok(flightService.getFlightDTO(id));
+        return ResponseEntity.ok(flightService.getFlight(id).toDTO());
     }
 }
