@@ -9,24 +9,25 @@ import jakarta.validation.constraints.Size;
 
 import java.util.*;
 
-public record StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
-                                        Map<Integer, Integer> pointsMap) implements IScoringStrategy {
-    public StablefordScoringStrategy {
+public class StablefordScoringStrategy extends BaseScoringStrategy {
+
+    final Map<Integer, Integer> pointsMap;
+
+    public StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
+                                     Map<Integer, Integer> pointsMap) {
         if (pars.size() != 18 || indexes.size() != 18) {
             throw new IllegalArgumentException("Pars and indexes must be of length 18");
         }
 
-    }
-
-    public StablefordScoringStrategy(Integer par, List<Integer> indexes, Map<Integer, Integer> pointsMap) {
-        this(Collections.nCopies(18, par), indexes, pointsMap);
+        this.pars = pars;
+        this.indexes = indexes;
+        this.pointsMap = pointsMap;
     }
 
     @Override
     public Flight calculateScores(List<ScoreCardDTO> cards) {
         Flight flight = Flight.builder()
                 .date(new Date())
-                .flightScores(new ArrayList<>())
                 .build();
 
         for (ScoreCardDTO card : cards) {
@@ -51,18 +52,6 @@ public record StablefordScoringStrategy(List<Integer> pars, List<Integer> indexe
     @Override
     public String getName() {
         return "STABLEFORD";
-    }
-
-    private int countBirdies(
-            @NotNull @Size(min = 18, max = 18, message = "Exactly 18 hole scores must be provided.")
-            List<Integer> scores) {
-        int birdies = 0;
-        for (int i = 0; i < 18; i++) {
-            if (scores.get(i) - pars.get(i) < 0) {
-                birdies++;
-            }
-        }
-        return birdies;
     }
 
     private int calculateScore(

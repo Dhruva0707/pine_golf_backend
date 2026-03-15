@@ -7,5 +7,8 @@ import java.util.Map;
 public record TournamentDTO(
         @Schema(description = "Tournament name", example = "02_02_2026_PineWoodsMMR")
         String name,
-        Map<Long, Integer> awards){}
+        @Schema(description = "Awards for each player")
+        Map<Long, Integer> awards,
+        Long id,
+        Long seasonId){}
 

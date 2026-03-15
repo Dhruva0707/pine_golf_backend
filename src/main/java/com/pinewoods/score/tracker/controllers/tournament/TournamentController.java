@@ -1,5 +1,7 @@
 package com.pinewoods.score.tracker.controllers.tournament;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtilities;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
@@ -16,13 +18,15 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
+import jakarta.websocket.server.PathParam;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +46,7 @@ public class TournamentController {
             @ApiResponse(responseCode = "201", description = "Tournament successfully started"),
             @ApiResponse(responseCode = "404", description = "Season not found")
     })
-    public ResponseEntity<Tournament> startTournament(@Valid @RequestBody TournamentCreateRequest request) {
+    public ResponseEntity<TournamentDTO> startTournament(@Valid @RequestBody TournamentCreateRequest request) {
         // Build the strategy instance from request data
         IScoringStrategy strategy = strategyFactory.getStrategy(
                 request.getStrategyType(),
@@ -56,16 +60,22 @@ public class TournamentController {
                 request.getSeasonName(),
                 strategy
         );
-        return new ResponseEntity<>(tournament, HttpStatus.CREATED);
+
+        TournamentDTO tournamentDTO = tournament.toDTO();
+        URI resultUri = ControllerUtilities.createResourceURI("name", tournamentDTO.name());
+        return ResponseEntity.created(resultUri).body(tournamentDTO);
     }
 
     @PostMapping("/{id}/flights")
     @Operation(summary = "Add a scorecard",
-            description = "Accepts a list of player scorecards for a single flight. Calculates scores immediately using the active strategy.")
+            description = """
+                    Accepts a list of player scorecards for a single flight.
+                    Calculates scores immediately using the active strategy.
+                    """)
     public ResponseEntity<FlightDTO> addFlight(
             @Parameter(description = "ID of the active tournament") @PathVariable Long id,
             @Valid @RequestBody List<ScoreCardDTO> cards) {
-        return ResponseEntity.ok(tournamentService.addScorecards(id, cards));
+        return ResponseEntity.ok(tournamentService.addScorecards(id, cards).toDTO());
     }
 
     @PostMapping("/{id}/end")
@@ -76,21 +86,40 @@ public class TournamentController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/season/{seasonName}")
-    @Operation(summary = "Get all tournaments in a season")
-    public ResponseEntity<List<TournamentDTO>> getBySeason(@PathVariable String seasonName) {
-        return ResponseEntity.ok(tournamentService.getTournamentsBySeason(seasonName));
+    @GetMapping("/{tournamentName}")
+    @Operation(summary = "Get tournament by the name",
+            description = "Returns a list of tournaments with the given name")
+    public ResponseEntity<List<TournamentDTO>> getTournamentByName(@PathVariable String tournamentName) {
+        List<TournamentDTO> tournaments = tournamentService.getTournamentsByName(tournamentName);
+        return ResponseEntity.ok(tournaments);
     }
+
+    @GetMapping("/{seasonName}/{tournamentName}")
+    @Operation(summary = "Get a tournament by name and season name")
+    public ResponseEntity<TournamentDTO> getTournament(@PathVariable("tournamentName") String tournamentName,
+                                                       @PathVariable("seasonName") String seasonName) {
+        return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
+    }
+
 
     // ------------ DTO's ----------
     @Data
+    @AllArgsConstructor
     public static class TournamentCreateRequest {
         @NotBlank
+        @JsonProperty("name")
         private String name;
-        @NotBlank private String seasonName;
-        @NotBlank private String strategyType; // "STABLEFORD", "STROKEPLAY", etc.
+        @JsonProperty("season_name")
+        @NotBlank
+        private String seasonName;
+        @JsonProperty("strategy_type")
+        @NotBlank
+        private String strategyType; // "STABLEFORD", "STROKEPLAY", etc.
+        @JsonProperty("pars")
         @Size(min = 18, max = 18) private List<Integer> pars;
+        @JsonProperty("indexes")
         @Size(min = 18, max = 18) private List<Integer> indexes;
+        @JsonProperty("points_map")
         @NotEmpty
         private Map<Integer, Integer> pointsMap;
     }

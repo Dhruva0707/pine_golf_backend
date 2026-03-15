@@ -1,10 +1,13 @@
 package com.pinewoods.score.tracker.entities.flight;
 
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -24,6 +27,18 @@ public class Flight {
     @NotNull
     private Date date;
 
-    @OneToMany(mappedBy = "flight", fetch = FetchType.EAGER, orphanRemoval = true)
-    private List<FlightScore> flightScores;
+    @OneToMany(mappedBy = "flight", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private final List<FlightScore> flightScores = new ArrayList<>();
+
+    public FlightDTO toDTO() {
+        List<FlightScoreDTO> scoreDTOs = new ArrayList<>();
+        if (!flightScores.isEmpty()) {
+            scoreDTOs = flightScores.stream()
+                    .map(fs ->
+                            new FlightScoreDTO(fs.getPlayer().getName(), fs.getScore(), fs.getBirdies()))
+                    .toList();
+        }
+
+        return new FlightDTO(date, scoreDTOs);
+    }
 }

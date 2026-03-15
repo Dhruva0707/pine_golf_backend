@@ -14,11 +14,14 @@ import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import com.pinewoods.score.tracker.entities.season.Season;
 import com.pinewoods.score.tracker.entities.season.TeamStanding;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
+import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
+import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import com.pinewoods.score.tracker.services.flight.FlightService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -45,7 +48,15 @@ public class TournamentService {
     @PreAuthorize( "hasRole('ADMIN')")
     public Tournament createTournament(String name, String seasonName, IScoringStrategy strategy) {
         Season season = seasonRepo.findByName(seasonName)
-                .orElseThrow(() -> new EntityNotFoundException("Season not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Season not found"));
+
+        if (season.isFinished()) {
+            throw new ResourceConflictException("Cannot create tournament for finished season");
+        }
+
+        if (season.getTournaments().stream().anyMatch(t -> t.getName().equals(name))) {
+            throw new ResourceConflictException("Tournament with this name already exists within the season");
+        }
 
         Tournament tournament = Tournament.builder()
                 .name(name)
@@ -70,22 +81,29 @@ public class TournamentService {
      */
     @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
-    public FlightDTO addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
+    public Flight addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
         Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
         IScoringStrategy strategy = activeStrategies.get(tournamentId);
 
-        if (strategy == null) {
-            throw new IllegalStateException("Tournament session expired or not initialized");
+        if (strategy == null || tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament session expired or not initialized");
         }
 
         // Use our Strategy to transform ScoreCards into a Flight entity
         Flight flight = strategy.calculateScores(cards);
         tournament.getFlights().add(flight);
 
+        // update birdies in standing for each team
+        for (FlightScore fs : flight.getFlightScores()) {
+            Team team = fs.getPlayer().getTeam();
+            standingRepo.findBySeasonNameAndTeamName(tournament.getSeason().getName(), team.getName())
+                    .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
+        }
+
         tournamentRepo.save(tournament); // Cascades to Flight and FlightScores
 
         // Convert to DTO for the frontend
-        return FlightService.createDTO(flight);
+        return flight;
     }
 
     /**
@@ -96,7 +114,8 @@ public class TournamentService {
     @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public void endTournament(Long tournamentId) {
-        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
+        Tournament tournament = tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament " + tournamentId + " not found"));
 
         // Calculate the 100, 66, 33 points and specialty awards
         calculateFinalAwards(tournament);
@@ -119,12 +138,32 @@ public class TournamentService {
      */
     public List<TournamentDTO> getTournamentsBySeason(String seasonName) {
         Season season = seasonRepo.findByName(seasonName)
-                .orElseThrow(() -> new RuntimeException("Season not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Season " + seasonName + " not found"));
 
         return tournamentRepo.findBySeasonId(season.getId())
                 .stream()
-                .map(t -> new TournamentDTO(t.getName(), t.getAwards()))
+                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
+                        t.getId(), t.getSeason().getId()))
                 .toList();
+    }
+
+    public List<TournamentDTO> getTournamentsByName(String name) {
+        return tournamentRepo.findAllByName(name)
+                .stream()
+                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
+                        t.getId(), t.getSeason().getId()))
+                .toList();
+    }
+
+    public Tournament getTournamentBySeasonAndName(String seasonName, String name) {
+        Season season = seasonRepo.findByName(seasonName)
+                .orElseThrow(() -> new ResourceNotFoundException("Season " + seasonName + " not found"));
+
+        return season.getTournaments().stream()
+                .filter(t -> t.getName().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament " + name +
+                        " not found in season " + seasonName));
     }
 
     // ================ Delete Tournament ======================
@@ -187,7 +226,8 @@ public class TournamentService {
     private void updateTeamStandings(Tournament tournament) {
         Season season = tournament.getSeason();
         tournament.getAwards().forEach((playerId, points) -> {
-            Player player = playerRepo.findById(playerId).orElseThrow();
+            Player player = playerRepo.findById(playerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Player with id " + playerId + " not found"));
             Team team = player.getTeam();
 
             // Find existing standing for this team in this season, or create new
@@ -196,6 +236,10 @@ public class TournamentService {
                     .orElse(TeamStanding.builder().season(season).team(team).points(0).build());
 
             standing.setPoints(standing.getPoints() + points);
+
+            // update wins
+            standing.setWins(standing.getWins() + 1);
+
             standingRepo.save(standing);
         });
     }

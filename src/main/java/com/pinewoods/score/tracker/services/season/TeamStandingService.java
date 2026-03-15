@@ -4,6 +4,7 @@ import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dto.season.TeamStandingDTO;
 import com.pinewoods.score.tracker.entities.season.TeamStanding;
+import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,7 @@ public class TeamStandingService {
      */
     public TeamStandingDTO getTeamStanding(String seasonName, String teamName) {
         TeamStanding standing = standingRepo.findBySeasonNameAndTeamName(seasonName, teamName)
-                .orElseThrow(() -> new RuntimeException("Standing not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Standing not found"));
 
         return new TeamStandingDTO(
                 standing.getTeam().getName(),
@@ -32,8 +33,7 @@ public class TeamStandingService {
                 standing.getWins(),
                 standing.getLosses(),
                 standing.getDraws(),
-                standing.getBirdies(),
-                standing.getEagles()
+                standing.getBirdies()
         );
     }
 
@@ -51,8 +51,7 @@ public class TeamStandingService {
                         ts.getWins(),
                         ts.getLosses(),
                         ts.getDraws(),
-                        ts.getBirdies(),
-                        ts.getEagles()
+                        ts.getBirdies()
                 ))
                 .toList();
     }

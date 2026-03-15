@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TournamentRepository extends JpaRepository<Tournament, Long> {
     List<Tournament> findBySeasonId(Long seasonId);
+    List<Tournament> findAllByName(String name);
 }

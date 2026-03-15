@@ -72,7 +72,7 @@ public class FlightService {
 
         flightScoreRepository.saveAll(flightScores);
 
-        flight.setFlightScores(flightScores);
+        flight.getFlightScores().addAll(flightScores);
 
         return flight;
     }
@@ -81,20 +81,5 @@ public class FlightService {
     public Flight getFlight(long id) {
         return flightRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Flight not found: " + id));
-    }
-
-    public FlightDTO getFlightDTO(long id) {
-        Flight flight = getFlight(id);
-        return createDTO(flight);
-    }
-
-    // ----------- Helper Methods -----------
-    public static FlightDTO createDTO(Flight flight) {
-        List<FlightScoreDTO> scoreDTOs = flight.getFlightScores().stream()
-                .map(fs ->
-                        new FlightScoreDTO(fs.getPlayer().getName(), fs.getScore(), fs.getBirdies()))
-                .toList();
-
-        return new FlightDTO(flight.getDate(), scoreDTOs);
     }
 }

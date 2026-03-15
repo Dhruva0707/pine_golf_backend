@@ -1,5 +1,6 @@
 package com.pinewoods.score.tracker.entities.season;
 
+import com.pinewoods.score.tracker.dto.season.TeamStandingDTO;
 import com.pinewoods.score.tracker.entities.admin.Team;
 import jakarta.persistence.*;
 import lombok.*;
@@ -27,5 +28,15 @@ public class TeamStanding {
     private int losses = 0;
     private int draws = 0;
     private int birdies = 0;
-    private int eagles = 0;
+
+    public TeamStandingDTO toDTO() {
+        return new TeamStandingDTO(
+                team.getName(),
+                points,
+                wins,
+                losses,
+                draws,
+                birdies
+        );
+    }
 }

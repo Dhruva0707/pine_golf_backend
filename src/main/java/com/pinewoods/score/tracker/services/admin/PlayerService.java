@@ -131,7 +131,7 @@ public class PlayerService {
                 .toList();
 
         return flights.stream()
-                .map(FlightService::createDTO)
+                .map(Flight::toDTO)
                 .toList();
     }
 

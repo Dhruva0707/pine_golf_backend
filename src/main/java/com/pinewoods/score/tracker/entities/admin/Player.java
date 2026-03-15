@@ -40,6 +40,6 @@ public class Player {
     @JoinColumn(name = "team_id")
     private Team team;
 
-    @OneToMany(mappedBy = "player", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "player", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FlightScore> flightScores;
 }
