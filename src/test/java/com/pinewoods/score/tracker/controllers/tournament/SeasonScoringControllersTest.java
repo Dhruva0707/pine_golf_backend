@@ -85,6 +85,8 @@ public class SeasonScoringControllersTest {
                 1, 1
         );
 
+        double handicapMultiplier = 1.0;
+
         ResponseEntity<String> createSeasonResp = sendRequest(
                 SEASON_PATH + "/start",
                 "Open Season",
@@ -100,7 +102,7 @@ public class SeasonScoringControllersTest {
 
         TournamentController.TournamentCreateRequest tournamentCreateRequest =
                 new TournamentController.TournamentCreateRequest(
-                tourName, seasonName, strategyType, pars, indexes, pointsMap
+                tourName, seasonName, strategyType, pars, indexes, pointsMap, handicapMultiplier
         );
 
         ResponseEntity<String> startRes = sendRequest(TOURNAMENT_PATH + "/start",

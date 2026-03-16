@@ -52,7 +52,8 @@ public class TournamentController {
                 request.getStrategyType(),
                 request.getPars(),
                 request.getIndexes(),
-                request.getPointsMap()
+                request.getPointsMap(),
+                request.getHandicapMultiplier()
         );
 
         Tournament tournament = tournamentService.createTournament(
@@ -122,5 +123,7 @@ public class TournamentController {
         @JsonProperty("points_map")
         @NotEmpty
         private Map<Integer, Integer> pointsMap;
+        @JsonProperty("handicap_multiplier")
+        private double handicapMultiplier;
     }
 }
