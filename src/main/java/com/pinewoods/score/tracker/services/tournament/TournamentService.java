@@ -229,6 +229,7 @@ public class TournamentService {
             Player player = playerRepo.findById(playerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Player with id " + playerId + " not found"));
             Team team = player.getTeam();
+            if (!team.getName().equalsIgnoreCase("UNASSIGNED")) {
 
             // Find existing standing for this team in this season, or create new
             TeamStanding standing = standingRepo.findBySeasonNameAndTeamName(
@@ -241,6 +242,7 @@ public class TournamentService {
             standing.setWins(standing.getWins() + 1);
 
             standingRepo.save(standing);
+            }
         });
     }
 }
