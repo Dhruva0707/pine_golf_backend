@@ -1,5 +1,6 @@
 package com.pinewoods.score.tracker.entities.admin;
 
+import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -42,4 +43,8 @@ public class Player {
 
     @OneToMany(mappedBy = "player", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FlightScore> flightScores;
+
+    public PlayerDTO toDTO() {
+        return new PlayerDTO(name, team.getName(), handicap);
+    }
 }

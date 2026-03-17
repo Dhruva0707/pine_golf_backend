@@ -10,5 +10,6 @@ public record TournamentDTO(
         @Schema(description = "Awards for each player")
         Map<Long, Integer> awards,
         Long id,
-        Long seasonId){}
+        Long seasonId,
+        String strategyName){}
 

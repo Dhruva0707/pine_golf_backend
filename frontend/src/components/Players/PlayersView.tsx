@@ -114,7 +114,7 @@ export const PlayersView = ({ isAdmin }: { isAdmin: boolean }) => {
                         </tr>
                     ) : filteredPlayers.length > 0 ? (
                         filteredPlayers.map(p => (
-                            <tr key={p.id} className="hover:bg-latte-base/30 transition-colors group">
+                            <tr key={p.name} className="hover:bg-latte-base/30 transition-colors group">
                                 <td className="px-8 py-5">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 bg-latte-base rounded-full flex items-center justify-center text-latte-subtext group-hover:bg-latte-mauve/10 group-hover:text-latte-mauve transition-colors">

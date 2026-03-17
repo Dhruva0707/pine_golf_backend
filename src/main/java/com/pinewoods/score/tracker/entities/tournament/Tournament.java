@@ -48,6 +48,6 @@ public class Tournament {
     private Map<Long, Integer> awards = new HashMap<>();
 
     public TournamentDTO toDTO() {
-        return new TournamentDTO(name, awards, id, season.getId());
+        return new TournamentDTO(name, awards, id, season.getId(), strategyName);
     }
 }

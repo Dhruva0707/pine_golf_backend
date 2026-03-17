@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Calendar, Trophy, LogOut } from 'lucide-react';
+import {LayoutDashboard, Users, Calendar, Trophy, LogOut, Send} from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 
 // Import our specialized views
 import { PlayersView } from './Players/PlayersView';
 import { TeamsView } from './Teams/TeamsView';
+import {SeasonsView} from "./Seasons/SeasonView.tsx";
 
 interface DecodedToken {
     roles: { authority: string }[];
@@ -55,7 +56,8 @@ export const Dashboard = () => {
                     {[
                         { id: 'seasons', label: 'Seasons', icon: <Calendar size={16}/> },
                         { id: 'teams', label: 'Teams', icon: <LayoutDashboard size={16}/> },
-                        { id: 'players', label: 'Players', icon: <Users size={16}/> }
+                        { id: 'players', label: 'Players', icon: <Users size={16}/> },
+                        { id: 'flights', label: 'Flights', icon: <Send size={16}/> }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -84,12 +86,15 @@ export const Dashboard = () => {
                 {/* 4. CONDITIONAL RENDERING: Shows a component based on the activeTab */}
                 {activeTab === 'players' && <PlayersView isAdmin={isAdmin} />}
                 {activeTab === 'teams' && <TeamsView isAdmin={isAdmin} />}
+                {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
 
-                {activeTab === 'seasons' && (
+                {activeTab === 'flights' && (
                     <div className="bg-white rounded-3xl p-16 border border-latte-crust text-center shadow-sm">
-                        <Calendar size={48} className="mx-auto mb-4 text-latte-crust" />
-                        <h2 className="text-2xl font-black text-latte-text">Seasons</h2>
-                        <p className="text-latte-subtext mt-2">Season management is coming in the next update.</p>
+                        <div className="w-16 h-16 bg-latte-mauve/10 text-latte-mauve rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Send size={32} />
+                        </div>
+                        <h2 className="text-2xl font-black text-latte-text">Flight Entry</h2>
+                        <p className="text-latte-subtext mt-2">Scorecard entry is coming next...</p>
                     </div>
                 )}
             </main>

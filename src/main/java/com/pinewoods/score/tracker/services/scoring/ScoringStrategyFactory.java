@@ -1,5 +1,6 @@
 package com.pinewoods.score.tracker.services.scoring;
 
+import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -8,9 +9,9 @@ import java.util.Map;
 @Component
 public class ScoringStrategyFactory {
     public IScoringStrategy getStrategy(String type, List<Integer> pars, List<Integer> indexes,
-                                        Map<Integer, Integer> pointsMap, double handicapMultiplier) {
+                                        Map<Integer, Integer> pointsMap, double handicapMultiplier, PlayerRepository playerRepository) {
         if ("STABLEFORD".equalsIgnoreCase(type)) {
-            return new StablefordScoringStrategy(pars, indexes, pointsMap, handicapMultiplier);
+            return new StablefordScoringStrategy(pars, indexes, pointsMap, handicapMultiplier, playerRepository);
         }
 
         // You can expand this with more strategies as they are built

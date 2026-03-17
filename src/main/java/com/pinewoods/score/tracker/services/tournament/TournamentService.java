@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class TournamentService {
     private final TournamentRepository tournamentRepo;
@@ -44,7 +45,6 @@ public class TournamentService {
      * @param strategy scoring strategy
      * @return Tournament object created
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public Tournament createTournament(String name, String seasonName, IScoringStrategy strategy) {
         Season season = seasonRepo.findByName(seasonName)
@@ -79,7 +79,6 @@ public class TournamentService {
      * @param cards scorecards for the flight
      * @return FlightDTO representing the flight
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public Flight addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
         Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
@@ -111,7 +110,6 @@ public class TournamentService {
      *
      * @param tournamentId tournament id
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public void endTournament(Long tournamentId) {
         Tournament tournament = tournamentRepo.findById(tournamentId)
@@ -142,16 +140,14 @@ public class TournamentService {
 
         return tournamentRepo.findBySeasonId(season.getId())
                 .stream()
-                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
-                        t.getId(), t.getSeason().getId()))
+                .map(Tournament::toDTO)
                 .toList();
     }
 
     public List<TournamentDTO> getTournamentsByName(String name) {
         return tournamentRepo.findAllByName(name)
                 .stream()
-                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
-                        t.getId(), t.getSeason().getId()))
+                .map(Tournament::toDTO)
                 .toList();
     }
 
@@ -169,7 +165,12 @@ public class TournamentService {
     // ================ Delete Tournament ======================
     @PreAuthorize( "hasRole('ADMIN')")
     public void deleteTournament(Long tournamentId) {
-        tournamentRepo.deleteById(tournamentId);
+        Tournament tournament = tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
+        Season season = tournament.getSeason();
+        season.getTournaments().remove(tournament);
+        tournamentRepo.delete(tournament);
+        activeStrategies.remove(tournamentId);
     }
 
     // ============= Utilities =============
