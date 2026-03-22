@@ -11,7 +11,8 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
     List<Integer> pars;
     List<Integer> indexes;
 
-    int countBirdies(
+    @Override
+    public int countBirdies(
             @NotNull @Size(min = 18, max = 18, message = "Exactly 18 hole scores must be provided.")
             List<Integer> scores) {
         int birdies = 0;
@@ -22,4 +23,6 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
         }
         return birdies;
     }
+
+
 }

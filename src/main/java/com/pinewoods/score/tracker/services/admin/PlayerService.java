@@ -115,6 +115,12 @@ public class PlayerService {
                 .toList();
     }
 
+    public PlayerDTO getPlayerById(Long id) {
+        return playerRepository.findById(id)
+                .map(PlayerService::createPlayerDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Player with id " + id + " does not exist."));
+    }
+
     /**
      * Retrieves all the flights for a player.
      * Along with the scores of the other players in the flight.

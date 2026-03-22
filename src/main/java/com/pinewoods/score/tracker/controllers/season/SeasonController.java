@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -85,8 +86,17 @@ public class SeasonController {
 
         return ResponseEntity.ok(
                 season.getStandings().stream()
+                        .sorted(Comparator.comparingInt(TeamStanding::getPoints).reversed())
                         .map(TeamStanding::toDTO)
                 .toList()
         );
+    }
+
+    // ==================== Delete Season ====================
+    @DeleteMapping("/{seasonName}")
+    @Operation(summary = "Delete a season")
+    ResponseEntity<Void> deleteSeason(@PathVariable("seasonName") String seasonName) {
+        seasonService.deleteSeason(seasonName);
+        return ResponseEntity.noContent().build();
     }
 }

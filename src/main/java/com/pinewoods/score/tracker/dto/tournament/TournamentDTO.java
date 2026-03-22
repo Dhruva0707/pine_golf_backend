@@ -1,7 +1,10 @@
 package com.pinewoods.score.tracker.dto.tournament;
 
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.List;
 import java.util.Map;
 
 public record TournamentDTO(
@@ -10,5 +13,7 @@ public record TournamentDTO(
         @Schema(description = "Awards for each player")
         Map<Long, Integer> awards,
         Long id,
-        Long seasonId){}
+        Long seasonId,
+        String strategyName,
+        List<FlightDTO> flights){}
 

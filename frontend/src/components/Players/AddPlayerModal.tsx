@@ -2,10 +2,16 @@ import { useState, useEffect, FormEvent } from 'react';
 import { X, UserPlus } from 'lucide-react';
 import api from '../../api/client.ts';
 
-export const AddPlayerModal = ({ isOpen, onClose, onSuccess }: any) => {
+interface AddPlayerModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+export const AddPlayerModal = ({ isOpen, onClose, onSuccess }: AddPlayerModalProps) => {
     const [name, setName] = useState('');
     const [handicap, setHandicap] = useState('0.0');
-    const [teamId, setTeamId] = useState('');
+    const [team, setTeam] = useState('');
     const [teams, setTeams] = useState<any[]>([]);
 
     useEffect(() => {
@@ -22,9 +28,9 @@ export const AddPlayerModal = ({ isOpen, onClose, onSuccess }: any) => {
             await api.post('/players', {
                 name,
                 handicap: parseFloat(handicap),
-                teamId: teamId === '' ? null : teamId // Optional team
+                team: team === '' ? null : team // Optional team
             });
-            setName(''); setHandicap('0.0'); setTeamId('');
+            setName(''); setHandicap('0.0'); setTeam('');
             onSuccess();
             onClose();
         } catch (err) { console.error(err); }
@@ -43,8 +49,8 @@ export const AddPlayerModal = ({ isOpen, onClose, onSuccess }: any) => {
 
                     <select
                         className="w-full p-4 rounded-2xl border border-latte-crust bg-white"
-                        value={teamId}
-                        onChange={e => setTeamId(e.target.value)}
+                        value={team}
+                        onChange={e => setTeam(e.target.value)}
                     >
                         <option value="">No Team (Optional)</option>
                         {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

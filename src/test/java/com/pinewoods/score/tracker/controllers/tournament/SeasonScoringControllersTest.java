@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pinewoods.score.tracker.dto.admin.AuthenticationDTOs;
+import com.pinewoods.score.tracker.dto.course.CourseDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
@@ -39,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @ActiveProfiles("test")
 public class SeasonScoringControllersTest {
 
+    private static final String TEST_COURSE = "testCourse";
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired private BCryptPasswordEncoder passwordEncoder;
@@ -100,9 +102,13 @@ public class SeasonScoringControllersTest {
         final String tourName = "Open Championship";
         final String strategyType = "STABLEFORD";
 
+        // create the test course
+        CourseDTO courseDTO = new CourseDTO(TEST_COURSE, pars, indexes);
+        sendRequest("/courses", objectMapper.writeValueAsString(courseDTO), token, HttpMethod.POST, restClient);
+
         TournamentController.TournamentCreateRequest tournamentCreateRequest =
                 new TournamentController.TournamentCreateRequest(
-                tourName, seasonName, strategyType, pars, indexes, pointsMap, handicapMultiplier
+                tourName, seasonName, strategyType, TEST_COURSE, pointsMap, handicapMultiplier
         );
 
         ResponseEntity<String> startRes = sendRequest(TOURNAMENT_PATH + "/start",
@@ -136,15 +142,16 @@ public class SeasonScoringControllersTest {
         highHandicapScores.set(9, 6);
 
 
+
         // We fetch players from DB to get real IDs for the DTO
         Player proPlayer = getPlayerByName("Pro_Phil");
         Player averagePlayer = getPlayerByName("Average_Joe");
         Player highHandicapPlayer = getPlayerByName("High_Harry");
 
         List<ScoreCardDTO> cards = List.of(
-                new ScoreCardDTO(proPlayer, proScores),
-                new ScoreCardDTO(averagePlayer, defaultTestScores),
-                new ScoreCardDTO(highHandicapPlayer, highHandicapScores)
+                new ScoreCardDTO(proPlayer.toDTO(), proScores),
+                new ScoreCardDTO(averagePlayer.toDTO(), defaultTestScores),
+                new ScoreCardDTO(highHandicapPlayer.toDTO(), highHandicapScores)
         );
 
         ResponseEntity<String> flightSubmission = sendRequest(
@@ -184,9 +191,9 @@ public class SeasonScoringControllersTest {
         TournamentDTO tournament = objectMapper.readValue(tournamentResult.getBody(), TournamentDTO.class);
         Map<Long, Integer> awards = tournament.awards();
         Map<Long, Integer> expectedAwards = Map.of(
-                averagePlayer.getId(), 100,
-                highHandicapPlayer.getId(), 66,
-                proPlayer.getId(), 83
+                averagePlayer.getId(), 1,
+                highHandicapPlayer.getId(), 2,
+                proPlayer.getId(), 3
         );
 
         assertEquals(expectedAwards, awards, "Awards should be " + expectedAwards);
