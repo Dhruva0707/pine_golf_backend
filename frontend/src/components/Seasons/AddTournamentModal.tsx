@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react';
-import { X, Trophy, Info, Zap } from 'lucide-react'; // Changed Activity to Trophy and added Zap
+import { useState, useEffect, FormEvent } from 'react';
+import { X, Trophy, MapPin, Settings2 } from 'lucide-react';
 import api from '../../api/client';
 
 interface AddTournamentModalProps {
@@ -10,27 +10,39 @@ interface AddTournamentModalProps {
 }
 
 export const AddTournamentModal = ({ isOpen, onClose, seasonName, onSuccess }: AddTournamentModalProps) => {
+    // --- State ---
     const [name, setName] = useState('');
+    const [selectedCourse, setSelectedCourse] = useState('');
+    const [courses, setCourses] = useState<any[]>([]);
     const [strategy, setStrategy] = useState('STABLEFORD');
-    const [multiplier, setMultiplier] = useState(0.8);
+    const [multiplier, setMultiplier] = useState(1.0);
+    const [pointsMap, setPointsMap] = useState<Record<string, number>>({
+        "-2": 4,
+        "-1": 3,
+        "0": 2,
+        "1": 1,
+        "2": 0
+    });
 
-    const [pars, setPars] = useState<number[]>(Array(18).fill(4));
-    const [indexes, setIndexes] = useState<number[]>(Array.from({ length: 18 }, (_, i) => i + 1));
-    const [pointsMap, setPointsMap] = useState<Record<string, number>>({ "-2": 4, "-1": 3, "0": 2, "1": 1, "2": 0 });
+    // --- Effects ---
+    useEffect(() => {
+        if (isOpen) {
+            fetchCourses();
+        }
+    }, [isOpen]);
+
+    const fetchCourses = async () => {
+        try {
+            const res = await api.get('/courses');
+            setCourses(res.data);
+        } catch (err) {
+            console.error("Failed to fetch courses:", err);
+        }
+    };
 
     if (!isOpen) return null;
 
-    // --- NEW: Bulk Update Helpers ---
-    const setAllPars = (val: number) => {
-        setPars(Array(18).fill(val));
-    };
-
-    const handleParChange = (index: number, value: string) => {
-        const newPars = [...pars];
-        newPars[index] = parseInt(value) || 0;
-        setPars(newPars);
-    };
-
+    // --- Handlers ---
     const handlePointChange = (key: string, val: string) => {
         setPointsMap(prev => ({
             ...prev,
@@ -38,48 +50,56 @@ export const AddTournamentModal = ({ isOpen, onClose, seasonName, onSuccess }: A
         }));
     };
 
-    const handleIndexChange = (index: number, value: string) => {
-        const newIndexes = [...indexes];
-        newIndexes[index] = parseInt(value) || 0;
-        setIndexes(newIndexes);
-    };
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+
+        // Match the TournamentCreateRequest DTO exactly
         const request = {
             name,
             season_name: seasonName,
             strategy_type: strategy,
-            pars,
-            indexes,
-            points_map: pointsMap,
-            handicap_multiplier: multiplier
+            courseName: selectedCourse,
+            pointsMap: Object.fromEntries(
+                Object.entries(pointsMap).map(([k, v]) => [parseInt(k), v])
+            ),
+            handicapMultiplier: multiplier
         };
 
         try {
             await api.post('/tournaments/start', request);
             onSuccess();
             onClose();
-        } catch (err) { console.error("Tourney start failed:", err); }
+        } catch (err) {
+            console.error("Tournament start failed:", err);
+            alert("Failed to start tournament. Ensure all fields are filled.");
+        }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-latte-text/20 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-latte-crust p-8 my-auto max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-4 border-b border-latte-base">
-                    <h3 className="text-2xl font-black flex items-center gap-2 text-latte-mauve">
-                        <Trophy size={28} /> New Tournament: {seasonName}
-                    </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-latte-text/20 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-latte-crust flex flex-col max-h-[90vh]">
+
+                {/* Header */}
+                <div className="p-8 border-b border-latte-base flex justify-between items-center">
+                    <div>
+                        <h3 className="text-2xl font-black flex items-center gap-2 text-latte-mauve">
+                            <Trophy size={28} /> New Tournament
+                        </h3>
+                        <p className="text-xs font-bold text-latte-subtext uppercase tracking-widest mt-1">
+                            Season: {seasonName}
+                        </p>
+                    </div>
                     <button onClick={onClose} className="text-latte-subtext hover:text-latte-red transition-colors"><X /></button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* Basic Info Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 space-y-2">
-                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext">Tournament Name</label>
+                <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto">
+
+                    {/* Course & Name Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext ml-1">Tournament Name</label>
                             <input
-                                className="w-full p-4 rounded-2xl border border-latte-crust outline-none focus:ring-2 focus:ring-latte-mauve"
+                                className="w-full p-4 rounded-2xl border border-latte-crust outline-none focus:ring-2 focus:ring-latte-mauve bg-latte-base/10"
                                 placeholder="e.g. Pinehurst Open"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
@@ -87,18 +107,40 @@ export const AddTournamentModal = ({ isOpen, onClose, seasonName, onSuccess }: A
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext">Strategy</label>
+                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext ml-1">Select Course</label>
+                            <div className="relative">
+                                <select
+                                    required
+                                    className="w-full p-4 rounded-2xl border border-latte-crust bg-latte-base/10 appearance-none outline-none focus:ring-2 focus:ring-latte-mauve font-bold"
+                                    value={selectedCourse}
+                                    onChange={e => setSelectedCourse(e.target.value)}
+                                >
+                                    <option value="">-- Choose Course --</option>
+                                    {courses.map(course => (
+                                        <option key={course.name} value={course.name}>{course.name}</option>
+                                    ))}
+                                </select>
+                                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-latte-subtext pointer-events-none" size={18} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Strategy & Multiplier Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext ml-1">Scoring Strategy</label>
                             <select
-                                className="w-full p-4 rounded-2xl border border-latte-crust bg-white"
+                                className="w-full p-4 rounded-2xl border border-latte-crust bg-white font-bold"
                                 value={strategy}
                                 onChange={e => setStrategy(e.target.value)}
                             >
                                 <option value="STABLEFORD">Stableford</option>
+                                <option value="STROKEPLAY">Stroke Play (Gross)</option>
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext flex justify-between">
-                                Handicap Allowance <span>{Math.round(multiplier * 100)}%</span>
+                            <label className="text-xs font-black uppercase tracking-widest text-latte-subtext flex justify-between ml-1">
+                                HCP Multiplier <span>{Math.round(multiplier * 100)}%</span>
                             </label>
                             <input
                                 type="range" min="0.5" max="1.5" step="0.05"
@@ -109,96 +151,46 @@ export const AddTournamentModal = ({ isOpen, onClose, seasonName, onSuccess }: A
                         </div>
                     </div>
 
-                    {/* Course Config Section */}
-                    <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-2 text-latte-subtext">
-                                <Info size={16} />
-                                <p className="text-xs font-bold uppercase tracking-widest">Course Layout</p>
-                            </div>
-
-                            {/* NEW: Quick Actions Bar */}
-                            <div className="flex items-center gap-2 bg-latte-base/50 p-1.5 rounded-2xl border border-latte-crust">
-                                <span className="text-[10px] font-black uppercase text-latte-subtext px-2 flex items-center gap-1">
-                                    <Zap size={12} className="text-latte-yellow" /> Set all pars:
-                                </span>
-                                {[3, 4, 5].map(v => (
-                                    <button
-                                        key={v}
-                                        type="button"
-                                        onClick={() => setAllPars(v)}
-                                        className="px-4 py-1.5 rounded-xl bg-white border border-latte-crust text-xs font-black hover:border-latte-mauve hover:text-latte-mauve transition-all active:scale-95"
-                                    >
-                                        Par {v}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-6 md:grid-cols-9 gap-3">
-                            {pars.map((par, i) => (
-                                <div key={i} className="space-y-1 bg-latte-base/30 p-2 rounded-xl border border-latte-crust hover:border-latte-mauve/30 transition-colors">
-                                    <span className="text-[10px] font-black text-latte-subtext block text-center uppercase">Hole {i+1}</span>
-                                    <div className="space-y-1">
-                                        <input
-                                            type="number"
-                                            className="w-full text-center bg-white rounded-lg border border-latte-crust text-sm font-bold py-1 focus:ring-1 focus:ring-latte-mauve outline-none"
-                                            value={par}
-                                            onChange={(e) => handleParChange(i, e.target.value)}
-                                        />
-                                        <input
-                                            type="number"
-                                            className="w-full text-center bg-white rounded-lg border border-latte-crust text-[10px] text-latte-blue py-1 outline-none"
-                                            value={indexes[i]}
-                                            onChange={(e) => handleIndexChange(i, e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Points Map Summary */}
-                    <div className="bg-latte-mauve/5 p-6 rounded-3xl border border-latte-mauve/20">
-                        <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-sm font-black text-latte-mauve uppercase">Point Values (Relative to Par)</h4>
+                    {/* Points Map Section */}
+                    <div className="bg-latte-base/30 p-6 rounded-3xl border border-latte-crust">
+                        <div className="flex justify-between items-center mb-6">
+                            <h4 className="text-xs font-black text-latte-mauve uppercase tracking-widest flex items-center gap-2">
+                                <Settings2 size={16} /> Points Distribution
+                            </h4>
                             <button
                                 type="button"
                                 onClick={() => setPointsMap({ "-2": 4, "-1": 3, "0": 2, "1": 1, "2": 0 })}
-                                className="text-[10px] font-black uppercase text-latte-subtext hover:text-latte-mauve underline"
+                                className="text-[10px] font-black uppercase text-latte-subtext hover:text-latte-mauve transition-colors"
                             >
                                 Reset to Standard
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                             {[
                                 { key: "-2", label: "Eagle" },
                                 { key: "-1", label: "Birdie" },
                                 { key: "0",  label: "Par" },
                                 { key: "1",  label: "Bogey" },
-                                { key: "2",  label: "Dbl Bogey" }
+                                { key: "2",  label: "Dbl +" }
                             ].map((item) => (
                                 <div key={item.key} className="space-y-1">
-                                    <label className="text-[10px] font-black text-latte-subtext uppercase block ml-1">
+                                    <label className="text-[9px] font-black text-latte-subtext uppercase text-center block">
                                         {item.label}
                                     </label>
                                     <input
                                         type="number"
-                                        className="w-full p-3 bg-white rounded-xl border border-latte-crust text-sm font-bold text-center focus:ring-2 focus:ring-latte-mauve outline-none"
+                                        className="w-full p-3 bg-white rounded-xl border border-latte-crust text-sm font-black text-center focus:border-latte-mauve outline-none shadow-sm"
                                         value={pointsMap[item.key]}
                                         onChange={(e) => handlePointChange(item.key, e.target.value)}
                                     />
                                 </div>
                             ))}
                         </div>
-                        <p className="mt-4 text-[10px] text-latte-subtext italic font-medium">
-                            *Points are awarded based on net score relative to hole par.
-                        </p>
                     </div>
 
-                    <button type="submit" className="w-full py-5 bg-latte-mauve text-white rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all text-lg">
-                        Start Tournament Session
+                    <button type="submit" className="w-full py-5 bg-latte-mauve text-white rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all text-lg uppercase tracking-widest">
+                        Initialize Tournament
                     </button>
                 </form>
             </div>

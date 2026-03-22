@@ -78,6 +78,34 @@ public class TournamentController {
         return ResponseEntity.created(resultUri).body(tournamentDTO);
     }
 
+    @PutMapping("/{seasonName}/{tournamentName}/restart")
+    @Operation(summary = "Reopen a finished tournament",
+            description = "Rolls back season standings and re-initializes the scoring engine.")
+    public ResponseEntity<Void> restartTournament(
+            @PathVariable String seasonName,
+            @PathVariable String tournamentName,
+            @Valid @RequestBody TournamentCreateRequest request) {
+
+        // 1. Resolve Course (Same as start)
+        Course course = courseRepository.findByName(request.getCourseName())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+
+        // 2. Build the strategy instance (Same as start)
+        IScoringStrategy strategy = strategyFactory.getStrategy(
+                request.getStrategyType(),
+                course.getPars(),
+                course.getIndexes(),
+                request.getPointsMap(),
+                request.getHandicapMultiplier(),
+                playerRepository
+        );
+
+        // 3. Execute Service Logic
+        tournamentService.restartTournament(seasonName, tournamentName, strategy);
+
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{id}/flights")
     @Operation(summary = "Add a scorecard",
             description = """

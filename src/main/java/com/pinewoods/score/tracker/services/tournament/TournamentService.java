@@ -73,6 +73,74 @@ public class TournamentService {
     }
 
     /**
+     * Restarts a finished tournament by reverting standing updates and clearing awards.
+     * @param tournamentId the id of the tournament to reopen
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public void restartTournament(String seasonName, String name, IScoringStrategy strategy) {
+        Season season = seasonRepo.findByName(seasonName)
+                .orElseThrow(() -> new ResourceNotFoundException("Season " + seasonName + " not found"));
+
+        if (season.isFinished()) {
+            throw new ResourceConflictException("Cannot create tournament for finished season");
+        }
+
+        Tournament tournament = season.getTournaments().stream()
+                .filter(t -> t.getName().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament " + name +
+                        " not found in season " + seasonName));
+
+        if (!tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament is already active");
+        }
+
+        revertBirdies(tournament, season);
+        revertAwards(tournament, season);
+
+        tournament.getAwards().clear();
+        tournament.setFinished(false);
+
+        // 4. Re-initialize the scoring strategy in the active map
+        // (Optional: requires the caller to know the strategy or fetch it by name)
+        // For now, we just save the state change.
+        tournamentRepo.saveAndFlush(tournament);
+        activeStrategies.put(tournament.getId(), strategy);
+    }
+
+    private void revertBirdies(Tournament tournament, Season season) {
+        // 1. Revert Birdie counts from Flight Scores
+        for (Flight flight : tournament.getFlights()) {
+            for (FlightScore fs : flight.getFlightScores()) {
+                Team team = fs.getPlayer().getTeam();
+                if (team != null && !team.getName().equalsIgnoreCase("UNASSIGNED")) {
+                    standingRepo.findBySeasonNameAndTeamName(season.getName(), team.getName())
+                            .ifPresent(standing -> {
+                                standing.setBirdies(Math.max(0, standing.getBirdies() - fs.getBirdies()));
+                            });
+                }
+            }
+        }
+    }
+
+    public void revertAwards(Tournament tournament, Season season) {
+        tournament.getAwards().forEach((playerId, points) -> {
+            Player player = playerRepo.findById(playerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Player not found"));
+            Team team = player.getTeam();
+
+            if (team != null && !team.getName().equalsIgnoreCase("UNASSIGNED")) {
+                standingRepo.findBySeasonNameAndTeamName(season.getName(), team.getName())
+                        .ifPresent(standing -> {
+                            standing.setPoints(Math.max(0, standing.getPoints() - points));
+                            standing.setWins(Math.max(0, standing.getWins() - 1));
+                        });
+            }
+        });
+    }
+
+    /**
      * Adds scorecards to a tournament.
      *
      * @param tournamentId tournament id
@@ -99,7 +167,7 @@ public class TournamentService {
                     .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
         }
 
-        tournamentRepo.save(tournament); // Cascades to Flight and FlightScores
+        tournamentRepo.saveAndFlush(tournament); // Cascades to Flight and FlightScores
 
         // Convert to DTO for the frontend
         return flight;

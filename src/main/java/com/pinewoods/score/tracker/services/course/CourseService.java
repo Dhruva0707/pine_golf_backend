@@ -5,6 +5,7 @@ import com.pinewoods.score.tracker.dto.course.CourseDTO;
 import com.pinewoods.score.tracker.entities.course.Course;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class CourseService {
         return course;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public Course updateCourse(String courseName, CourseDTO dto) {
         Course course = courseRepository.findByName(courseName)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
@@ -37,6 +39,7 @@ public class CourseService {
         return course;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteCourse(String name) {
         courseRepository.deleteByName(name);
     }

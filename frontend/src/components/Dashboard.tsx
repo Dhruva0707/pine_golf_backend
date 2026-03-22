@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import {LayoutDashboard, Users, Calendar, Trophy, LogOut, Send} from 'lucide-react';
+import {LayoutDashboard, Users, Calendar, LogOut, Send, Map} from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 
 // Import our specialized views
 import { PlayersView } from './Players/PlayersView';
 import { TeamsView } from './Teams/TeamsView';
-import {SeasonsView} from "./Seasons/SeasonView.tsx";
+import {SeasonsView} from "./Seasons/SeasonView";
+import {CourseManager} from "./Courses/CourseView";
 
 interface DecodedToken {
     roles: { authority: string }[];
@@ -16,6 +17,7 @@ export const Dashboard = () => {
     // 1. STATE: This is the "brain" of the component.
     const [activeTab, setActiveTab] = useState('players');
     const [isAdmin, setIsAdmin] = useState(false);
+    const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
     // 2. EFFECT: This runs once when the page loads.
     useEffect(() => {
@@ -26,6 +28,7 @@ export const Dashboard = () => {
                 // Check if the user has the 'ROLE_ADMIN' authority
                 const hasAdminRole = decoded.roles?.some(r => r.authority === 'ROLE_ADMIN') ?? false;
                 setIsAdmin(hasAdminRole);
+                setCurrentUserName(decoded.sub);
             } catch (e) {
                 console.error("Token decoding failed", e);
             }
@@ -57,6 +60,7 @@ export const Dashboard = () => {
                         { id: 'seasons', label: 'Seasons', icon: <Calendar size={16}/> },
                         { id: 'teams', label: 'Teams', icon: <LayoutDashboard size={16}/> },
                         { id: 'players', label: 'Players', icon: <Users size={16}/> },
+                        { id: 'courses', label: 'Courses', icon: <Map size={16}/> },
                         { id: 'flights', label: 'Flights', icon: <Send size={16}/> }
                     ].map((tab) => (
                         <button
@@ -84,9 +88,10 @@ export const Dashboard = () => {
             {/* --- CONTENT AREA --- */}
             <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full">
                 {/* 4. CONDITIONAL RENDERING: Shows a component based on the activeTab */}
-                {activeTab === 'players' && <PlayersView isAdmin={isAdmin} />}
+                {activeTab === 'players' && <PlayersView isAdmin={isAdmin} currentUserName={currentUserName} />}
                 {activeTab === 'teams' && <TeamsView isAdmin={isAdmin} />}
                 {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
+                {activeTab === 'courses' && <CourseManager isAdmin={isAdmin} />}
 
                 {activeTab === 'flights' && (
                     <div className="bg-white rounded-3xl p-16 border border-latte-crust text-center shadow-sm">

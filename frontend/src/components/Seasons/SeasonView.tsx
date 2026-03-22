@@ -114,7 +114,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                     <>
                         <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-latte-crust shadow-sm">
                             <div>
-                                <h2 className="text-3xl font-black text-latte-text">{selectedSeason}</h2>
+                                <h2 className="test-xl font-black text-latte-text">{selectedSeason}</h2>
                                 <p className="text-latte-subtext font-medium">{tournaments.length} Tournaments Total</p>
                             </div>
                             {isAdmin && (
