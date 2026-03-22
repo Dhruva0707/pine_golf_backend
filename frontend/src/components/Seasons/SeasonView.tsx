@@ -1,49 +1,104 @@
-import { useState, useEffect } from 'react';
-import { Plus, Calendar, Trophy, ChevronRight, Trash2, Settings2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Calendar, Trophy, ChevronRight, Trash2, Settings2, CheckCircle2, Award } from 'lucide-react';
 import api from '../../api/client';
 import { AddTournamentModal } from './AddTournamentModal';
 import { FlightManagerModal } from '../Flights/AddFlightModal';
+
+interface TeamStandingDTO {
+    teamName: string;
+    points: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    birdies: number;
+}
 
 export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const [seasons, setSeasons] = useState<string[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
     const [tournaments, setTournaments] = useState<any[]>([]);
+    const [standings, setStandings] = useState<TeamStandingDTO[]>([]);
+    const [playerMap, setPlayerMap] = useState<Record<number, string>>({}); // ID -> Name
     const [isTourneyModalOpen, setIsTourneyModalOpen] = useState(false);
     const [activeTourneyForFlights, setActiveTourneyForFlights] = useState<any | null>(null);
+    const [expandedFlights, setExpandedFlights] = useState<Record<number, boolean>>({});
+
+    const sortedSeasons = useMemo(() => {
+        return [...seasons].sort((a, b) => b.localeCompare(a));
+    }, [seasons]);
 
     useEffect(() => {
         fetchSeasons();
+        fetchPlayers(); // Fetch players once on mount
     }, []);
 
     const fetchSeasons = async () => {
         const res = await api.get('/seasons');
         setSeasons(res.data);
-        if (res.data.length > 0 && !selectedSeason) setSelectedSeason(res.data[0]);
+        if (res.data.length > 0 && !selectedSeason) {
+            const sorted = [...res.data].sort((a, b) => b.localeCompare(a));
+            setSelectedSeason(sorted[0]);
+        }
     };
 
-    const fetchTournaments = async () => {
+    const fetchPlayers = async () => {
+        try {
+            const res = await api.get('/players');
+            const mapping: Record<number, string> = {};
+            res.data.forEach((p: any) => {
+                mapping[p.id] = p.name;
+            });
+            setPlayerMap(mapping);
+        } catch (err) { console.error("Failed to fetch players", err); }
+    };
+
+    const PlayerName = ({ id }: { id: string | number }) => {
+        const [name, setName] = useState<string>(`ID: ${id}`);
+
+        useEffect(() => {
+            const fetchName = async () => {
+                try {
+                    // Calling your specific /players/id/{id} endpoint
+                    const res = await api.get(`/players/id/${id}`);
+                    setName(res.data.name);
+                } catch (err) {
+                    console.error(`Failed to fetch name for player ${id}`, err);
+                }
+            };
+            fetchName();
+        }, [id]);
+
+        return <span>{name}</span>;
+    };
+
+    const fetchDataForSeason = async () => {
         if (selectedSeason) {
-            const res = await api.get(`/seasons/${selectedSeason}/tournaments`);
-            setTournaments(res.data);
+            const [tourneyRes, standingsRes] = await Promise.all([
+                api.get(`/seasons/${selectedSeason}/tournaments`),
+                api.get(`/seasons/${selectedSeason}/standing`)
+            ]);
+            setTournaments(tourneyRes.data);
+            setStandings(standingsRes.data);
         }
     };
 
     useEffect(() => {
-        fetchTournaments();
+        fetchDataForSeason();
     }, [selectedSeason]);
 
+    // --- Handlers ---
     const handleAddSeason = async () => {
-        const name = window.prompt("Enter Season Name (e.g., 2026 Spring League):");
+        const name = window.prompt("Enter Season Name:");
         if (name) {
             try {
                 await api.post('/seasons/start', name, { headers: { 'Content-Type': 'text/plain' } });
                 fetchSeasons();
-            } catch (err: any) { alert(err.response?.data?.message || "Failed to create season."); }
+            } catch (err: any) { alert(err.response?.data?.message || "Error"); }
         }
     };
 
     const handleDeleteSeason = async (name: string) => {
-        if (window.confirm(`Are you sure you want to delete the entire "${name}" season and all its tournaments?`)) {
+        if (window.confirm(`Delete "${name}" and all data?`)) {
             try {
                 await api.delete(`/seasons/${name}`);
                 setSelectedSeason(null);
@@ -52,55 +107,52 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         }
     };
 
-    const handleDeleteTournament = async (seasonName: string, tournamentName: string) => {
-        if (window.confirm(`Delete tournament "${tournamentName}"?`)) {
+    const handleFinishSeason = async () => {
+        if (window.confirm(`Finalize ${selectedSeason}?`)) {
             try {
-                // Updated path based on your new Controller mapping
-                // URL: /tournament/{seasonName}/{tournamentName}
-                await api.delete(`/tournaments/${seasonName}/${tournamentName}`);
-
-                // Refresh the list after successful deletion
-                fetchTournaments();
-            } catch (err: any) {
-                console.error("Delete failed:", err);
-                alert(err.response?.data?.message || "Error deleting tournament.");
-            }
+                await api.post(`/seasons/${selectedSeason}/finish`);
+                fetchDataForSeason();
+            } catch (err) { alert("Error finishing season."); }
         }
     };
 
+    const handleDeleteTournament = async (seasonName: string, tournamentName: string) => {
+        if (window.confirm(`Delete tournament "${tournamentName}"?`)) {
+            try {
+                await api.delete(`/tournaments/${seasonName}/${tournamentName}`);
+                fetchDataForSeason();
+            } catch (err: any) { alert("Error deleting tournament."); }
+        }
+    };
+
+    // --- Logic for Ties ---
+    let currentRank = 0;
+    let lastPoints = -1;
+
     return (
         <div className="grid grid-cols-12 gap-8">
-            {/* Sidebar: Season List */}
-            <div className="col-span-12 md:col-span-4 space-y-4">
+            {/* Sidebar */}
+            <div className="col-span-12 md:col-span-3 space-y-4">
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="font-black text-latte-subtext uppercase tracking-widest text-xs ml-2">All Seasons</h3>
                     {isAdmin && (
-                        <button onClick={handleAddSeason} className="text-latte-green hover:bg-latte-green/10 p-2 rounded-xl transition-colors">
+                        <button onClick={handleAddSeason} className="text-latte-green hover:bg-latte-green/10 p-2 rounded-xl">
                             <Plus size={20} />
                         </button>
                     )}
                 </div>
-                {seasons.map(s => (
+                {sortedSeasons.map(s => (
                     <div key={s} className="group relative">
                         <button
                             onClick={() => setSelectedSeason(s)}
-                            className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all ${
-                                selectedSeason === s
-                                    ? 'bg-white border-latte-mauve shadow-md translate-x-2'
-                                    : 'bg-latte-mantle border-latte-crust hover:border-latte-subtext'
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                                selectedSeason === s ? 'bg-white border-latte-mauve shadow-md' : 'bg-latte-mantle border-transparent'
                             }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <Calendar className={selectedSeason === s ? 'text-latte-mauve' : 'text-latte-subtext'} size={18} />
-                                <span className="font-bold">{s}</span>
-                            </div>
-                            {selectedSeason === s && <ChevronRight size={18} className="text-latte-mauve" />}
+                            <span className={`font-bold ${selectedSeason === s ? 'text-latte-text' : 'text-latte-subtext'}`}>{s}</span>
                         </button>
                         {isAdmin && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteSeason(s); }}
-                                className="absolute -right-2 -top-2 bg-latte-red text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteSeason(s); }} className="absolute -right-2 -top-2 bg-latte-red text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Trash2 size={14} />
                             </button>
                         )}
@@ -108,92 +160,145 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                 ))}
             </div>
 
-            {/* Main: Tournament List Area */}
-            <div className="col-span-12 md:col-span-8 space-y-6">
-                {selectedSeason ? (
+            {/* Main */}
+            <div className="col-span-12 md:col-span-9 space-y-8">
+                {selectedSeason && (
                     <>
-                        <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-latte-crust shadow-sm">
+                        <div className="flex justify-between items-end">
                             <div>
-                                <h2 className="test-xl font-black text-latte-text">{selectedSeason}</h2>
-                                <p className="text-latte-subtext font-medium">{tournaments.length} Tournaments Total</p>
+                                <h2 className="text-xl font-black text-latte-text">{selectedSeason}</h2>
+                                <p className="text-latte-subtext font-bold uppercase tracking-tighter">Season Dashboard</p>
                             </div>
-                            {isAdmin && (
-                                <button
-                                    onClick={() => setIsTourneyModalOpen(true)}
-                                    className="bg-latte-mauve text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:brightness-110 transition-all"
-                                >
-                                    <Trophy size={20} /> New Tournament
-                                </button>
-                            )}
+                            <div className="flex gap-3">
+                                {isAdmin && (
+                                    <button onClick={handleFinishSeason} className="bg-latte-green text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
+                                        <CheckCircle2 size={18} /> Finish Season
+                                    </button>
+                                )}
+                                {isAdmin && (
+                                    <button onClick={() => setIsTourneyModalOpen(true)} className="bg-latte-mauve text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
+                                        <Trophy size={18} /> New Tournament
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4">
-                            {tournaments.length > 0 ? (
-                                tournaments.map(t => (
-                                    <div key={t.id} className="bg-white p-6 rounded-2xl border border-latte-crust flex items-center justify-between group hover:shadow-md transition-shadow">
+                        {/* Standings Table with Tie Support */}
+                        <section className="bg-white rounded-3xl border border-latte-crust overflow-hidden shadow-sm">
+                            <table className="w-full text-left">
+                                <thead className="bg-latte-mantle text-latte-subtext text-xs uppercase font-black">
+                                <tr>
+                                    <th className="px-6 py-3">Rank</th>
+                                    <th className="px-6 py-3">Team</th>
+                                    <th className="px-6 py-3 text-center">Pts</th>
+                                    <th className="px-6 py-3 text-center">W-L-D</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-latte-crust">
+                                {standings.map((team, idx) => {
+                                    if (team.points !== lastPoints) {
+                                        currentRank = idx + 1;
+                                        lastPoints = team.points;
+                                    }
+                                    return (
+                                        <tr key={team.teamName} className="hover:bg-latte-base/10 transition-colors">
+                                            <td className="px-6 py-4 font-black text-latte-subtext">{currentRank}</td>
+                                            <td className="px-6 py-4 font-bold text-latte-text">{team.teamName}</td>
+                                            <td className="px-6 py-4 text-center font-black text-latte-mauve">{team.points}</td>
+                                            <td className="px-6 py-4 text-center text-latte-subtext text-sm">{team.wins}-{team.losses}-{team.draws}</td>
+                                        </tr>
+                                    );
+                                })}
+                                </tbody>
+                            </table>
+                        </section>
+
+                        {/* Tournaments with Player Name Awards */}
+                        <div className="space-y-4">
+                            {tournaments.map(t => (
+                                <div key={t.id} className="bg-white rounded-2xl border border-latte-crust overflow-hidden shadow-sm">
+                                    {t.awards && Object.keys(t.awards).length > 0 && (
+                                        <div className="bg-latte-yellow/10 p-4 border-b border-latte-yellow/20 flex gap-4 overflow-x-auto">
+                                            <div className="flex items-center gap-2 text-latte-yellow-dark font-black text-xs uppercase whitespace-nowrap">
+                                                <Award size={16} /> Awards:
+                                            </div>
+                                            {Object.entries(t.awards)
+                                                .sort((a, b) => (a[1] as number) - (b[1] as number))
+                                                .map(([playerId, rank]) => (
+                                                    <div
+                                                        key={playerId}
+                                                        className="bg-white px-3 py-1 rounded-full border border-latte-yellow/30 text-xs font-bold shadow-sm flex items-center gap-1"
+                                                    >
+                                                        <PlayerName id={playerId} />, Rank {String(rank)}
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    )}
+
+                                    <div className="p-5 flex items-center justify-between">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-latte-base rounded-xl flex items-center justify-center text-latte-mauve">
-                                                <Trophy size={24} />
+                                            <div className="w-10 h-10 bg-latte-mantle rounded-xl flex items-center justify-center text-latte-mauve">
+                                                <Trophy size={20} />
                                             </div>
                                             <div>
-                                                <h4 className="font-black text-lg text-latte-text">{t.name}</h4>
-                                                <p className="text-xs text-latte-subtext font-bold uppercase tracking-wider">
-                                                    • {t.strategyName}
-                                                </p>
+                                                <h4 className="font-black text-latte-text">{t.name}</h4>
+                                                <p className="text-[10px] text-latte-subtext font-bold uppercase tracking-widest">{t.strategyName}</p>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setActiveTourneyForFlights({ ...t, seasonName: selectedSeason })}
-                                                className="..."
-                                            >
-                                                <Settings2 size={16} /> Manage Flights
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setExpandedFlights(prev => ({ ...prev, [t.id]: !prev[t.id] }))} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                                <ChevronRight size={16} className={`${expandedFlights[t.id] ? 'rotate-90' : ''} transition-transform`} /> View Flights
                                             </button>
-                                            {isAdmin && (
-                                                <button
-                                                    // 2. Pass both names to the handler
-                                                    onClick={() => handleDeleteTournament(selectedSeason!, t.name)}
-                                                    className="p-2 text-latte-subtext hover:text-latte-red hover:bg-latte-red/10 rounded-xl transition-all"
-                                                >
-                                                    <Trash2 size={20} />
-                                                </button>
-                                            )}
+                                            <button onClick={() => setActiveTourneyForFlights({...t, seasonName: selectedSeason})} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                                <Settings2 size={16} /> Manage
+                                            </button>
+                                            {isAdmin && <button onClick={() => handleDeleteTournament(selectedSeason!, t.name)} className="p-2 text-latte-subtext hover:text-latte-red rounded-lg"><Trash2 size={18} /></button>}
                                         </div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-20 bg-latte-mantle/50 rounded-3xl border-2 border-dashed border-latte-crust">
-                                    <p className="text-latte-subtext italic">No tournaments found for {selectedSeason}.</p>
+
+                                    {expandedFlights[t.id] && (
+                                        <div className="px-5 pb-5">
+                                            {(!t.flights || t.flights.length === 0) ? (
+                                                <div className="text-sm text-latte-subtext font-bold bg-latte-mantle rounded-xl p-4">No flights recorded yet.</div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {t.flights.map((fd: any, fIdx: number) => (
+                                                        <div key={fIdx} className="border border-latte-crust rounded-xl overflow-hidden">
+                                                            <div className="bg-latte-base px-4 py-2 flex items-center gap-2 text-latte-subtext text-xs uppercase font-black">
+                                                                <Calendar size={14} /> Flight on {fd.date ? new Date(fd.date).toLocaleString() : 'Unknown date'}
+                                                            </div>
+                                                            <div className="p-4">
+                                                                <div className="grid grid-cols-12 text-xs font-black text-latte-subtext uppercase mb-2">
+                                                                    <div className="col-span-6">Player</div>
+                                                                    <div className="col-span-3 text-center">Score</div>
+                                                                    <div className="col-span-3 text-center">Birdies</div>
+                                                                </div>
+                                                                <div className="divide-y divide-latte-crust">
+                                                                    {fd.flights && fd.flights.map((fs: any, sIdx: number) => (
+                                                                        <div key={sIdx} className="grid grid-cols-12 py-2 items-center">
+                                                                            <div className="col-span-6 font-bold text-latte-text">{fs.playerName}</div>
+                                                                            <div className="col-span-3 text-center font-black text-latte-mauve">{fs.score}</div>
+                                                                            <div className="col-span-3 text-center text-latte-subtext">{fs.birdies}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            ))}
                         </div>
                     </>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center bg-white rounded-3xl border border-latte-crust p-12 text-center shadow-sm">
-                        <Calendar size={40} className="text-latte-subtext mb-6" />
-                        <h3 className="text-2xl font-black text-latte-text">No Season Selected</h3>
-                        <p className="text-latte-subtext mt-2 max-w-xs mx-auto">
-                            {seasons.length > 0 ? "Select a season to manage tournaments." : "Create your first season to get started."}
-                        </p>
-                    </div>
                 )}
             </div>
 
-            <AddTournamentModal
-                isOpen={isTourneyModalOpen}
-                onClose={() => setIsTourneyModalOpen(false)}
-                seasonName={selectedSeason || ''}
-                onSuccess={fetchTournaments}
-            />
-            <FlightManagerModal
-                isOpen={!!activeTourneyForFlights}
-                onClose={() => {
-                    setActiveTourneyForFlights(null);
-                    fetchTournaments(); // Refresh list to see if 'isFinished' changed
-                }}
-                tournament={activeTourneyForFlights}
-            />
+            <AddTournamentModal isOpen={isTourneyModalOpen} onClose={() => setIsTourneyModalOpen(false)} seasonName={selectedSeason || ''} onSuccess={fetchDataForSeason} />
+            <FlightManagerModal isOpen={!!activeTourneyForFlights} onClose={() => { setActiveTourneyForFlights(null); fetchDataForSeason(); }} tournament={activeTourneyForFlights} />
         </div>
     );
 };

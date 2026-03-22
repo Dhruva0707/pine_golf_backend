@@ -11,4 +11,8 @@ public interface IScoringStrategy {
     Flight calculateScores(List<ScoreCardDTO> scoreCards);
 
     String getName();
+
+    int countBirdies(
+            @NotNull @Size(min = 18, max = 18, message = "Exactly 18 hole scores must be provided.")
+            List<Integer> scores);
 }

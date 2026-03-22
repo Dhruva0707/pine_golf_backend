@@ -191,9 +191,9 @@ public class SeasonScoringControllersTest {
         TournamentDTO tournament = objectMapper.readValue(tournamentResult.getBody(), TournamentDTO.class);
         Map<Long, Integer> awards = tournament.awards();
         Map<Long, Integer> expectedAwards = Map.of(
-                averagePlayer.getId(), 100,
-                highHandicapPlayer.getId(), 66,
-                proPlayer.getId(), 83
+                averagePlayer.getId(), 1,
+                highHandicapPlayer.getId(), 2,
+                proPlayer.getId(), 3
         );
 
         assertEquals(expectedAwards, awards, "Awards should be " + expectedAwards);

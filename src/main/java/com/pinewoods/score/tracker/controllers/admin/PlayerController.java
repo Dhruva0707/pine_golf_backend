@@ -59,9 +59,15 @@ public class PlayerController {
 
     // -------- Read Methods --------
 
-    @Operation(summary = "Get player by name", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/id/{id}")
+    public ResponseEntity<PlayerDTO> getPlayerById(@PathVariable Long id) {
+        PlayerDTO result = playerService.getPlayerById(id);
+        return ResponseEntity.ok(result);
+    }
+
+    // Only match names that start with letters (not "id")
     @GetMapping("/{name}")
-    public ResponseEntity<PlayerDTO> getPlayer(@PathVariable String name) {
+    public ResponseEntity<PlayerDTO> getPlayerByName(@PathVariable String name) {
         PlayerDTO result = playerService.getPlayerByName(name);
         return ResponseEntity.ok(result);
     }

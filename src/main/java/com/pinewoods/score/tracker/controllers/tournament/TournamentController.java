@@ -5,6 +5,7 @@ import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtiliti
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.course.Course;
@@ -78,34 +79,6 @@ public class TournamentController {
         return ResponseEntity.created(resultUri).body(tournamentDTO);
     }
 
-    @PutMapping("/{seasonName}/{tournamentName}/restart")
-    @Operation(summary = "Reopen a finished tournament",
-            description = "Rolls back season standings and re-initializes the scoring engine.")
-    public ResponseEntity<Void> restartTournament(
-            @PathVariable String seasonName,
-            @PathVariable String tournamentName,
-            @Valid @RequestBody TournamentCreateRequest request) {
-
-        // 1. Resolve Course (Same as start)
-        Course course = courseRepository.findByName(request.getCourseName())
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
-
-        // 2. Build the strategy instance (Same as start)
-        IScoringStrategy strategy = strategyFactory.getStrategy(
-                request.getStrategyType(),
-                course.getPars(),
-                course.getIndexes(),
-                request.getPointsMap(),
-                request.getHandicapMultiplier(),
-                playerRepository
-        );
-
-        // 3. Execute Service Logic
-        tournamentService.restartTournament(seasonName, tournamentName, strategy);
-
-        return ResponseEntity.ok().build();
-    }
-
     @PostMapping("/{id}/flights")
     @Operation(summary = "Add a scorecard",
             description = """
@@ -139,6 +112,13 @@ public class TournamentController {
     public ResponseEntity<TournamentDTO> getTournament(@PathVariable("tournamentName") String tournamentName,
                                                        @PathVariable("seasonName") String seasonName) {
         return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
+    }
+
+    @GetMapping("/{seasonName}/{tournamentName}/leaderBoard")
+    @Operation(summary = "Get the current tournament's leaderboard")
+    public ResponseEntity<List<FlightScoreDTO>> getLeaderBoard(@PathVariable("tournamentName") String tournamentName,
+                                                               @PathVariable("seasonName") String seasonName) {
+        return ResponseEntity.ok(tournamentService.getTournamentLeaderBoard(seasonName, tournamentName));
     }
 
     // ------------ Delete Tournament -----------

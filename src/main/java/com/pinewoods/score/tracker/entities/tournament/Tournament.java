@@ -1,9 +1,12 @@
 package com.pinewoods.score.tracker.entities.tournament;
 
+import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.season.Season;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
+import com.pinewoods.score.tracker.services.tournament.TournamentService;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -35,6 +38,7 @@ public class Tournament {
             joinColumns = @JoinColumn(name = "tournament_id"),
             inverseJoinColumns = @JoinColumn(name = "flight_id")
     )
+
     private List<Flight> flights = new ArrayList<>();
 
     private String strategyName; // e.g., "STABLEFORD"
@@ -48,6 +52,11 @@ public class Tournament {
     private Map<Long, Integer> awards = new HashMap<>();
 
     public TournamentDTO toDTO() {
-        return new TournamentDTO(name, awards, id, season.getId(), strategyName);
+
+        List<FlightDTO> flightDTOS = null;
+        if (flights != null && !flights.isEmpty()) {
+            flightDTOS = flights.stream().map(Flight::toDTO).toList();
+        }
+        return new TournamentDTO(name, awards, id, season.getId(), strategyName, flightDTOS);
     }
 }
