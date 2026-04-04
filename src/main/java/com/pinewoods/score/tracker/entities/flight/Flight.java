@@ -34,8 +34,7 @@ public class Flight {
         List<FlightScoreDTO> scoreDTOs = new ArrayList<>();
         if (!flightScores.isEmpty()) {
             scoreDTOs = flightScores.stream()
-                    .map(fs ->
-                            new FlightScoreDTO(fs.getPlayer().getName(), fs.getScore(), fs.getBirdies()))
+                    .map(FlightScore::toDto)
                     .toList();
         }
 

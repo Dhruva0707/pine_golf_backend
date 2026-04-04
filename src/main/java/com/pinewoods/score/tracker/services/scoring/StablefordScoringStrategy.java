@@ -19,7 +19,7 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
     PlayerRepository playerRepo;
 
     public StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
-                                     Map<Integer, Integer> pointsMap, double handicapMultiplier,
+                                     Map<Integer, Integer> pointsMap, double handicapMultiplier, String courseName,
                                      PlayerRepository playerRepo) {
         if (pars.size() != 18 || indexes.size() != 18) {
             throw new IllegalArgumentException("Pars and indexes must be of length 18");
@@ -30,6 +30,7 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
         this.pointsMap = pointsMap;
         this.handicapMultiplier = handicapMultiplier;
         this.playerRepo = playerRepo;
+        this.courseName = courseName;
     }
 
     @Override
@@ -40,7 +41,7 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
 
         for (ScoreCardDTO card : cards) {
             PlayerDTO player = card.player();
-            int handicap = (int) Math.round(Math.round(player.handicap() * handicapMultiplier));
+            int handicap = (int) Math.round(player.handicap() * handicapMultiplier);
 
             // Perform the handicap/par/index math we discussed
             int totalPoints = calculateScore(card.holeScores(), handicap);

@@ -7,6 +7,7 @@ import { PlayersView } from './Players/PlayersView';
 import { TeamsView } from './Teams/TeamsView';
 import {SeasonsView} from "./Seasons/SeasonView";
 import {CourseManager} from "./Courses/CourseView";
+import {FlightsView} from "./Flights/FlightView";
 
 interface DecodedToken {
     roles: { authority: string }[];
@@ -93,15 +94,7 @@ export const Dashboard = () => {
                 {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
                 {activeTab === 'courses' && <CourseManager isAdmin={isAdmin} />}
 
-                {activeTab === 'flights' && (
-                    <div className="bg-white rounded-3xl p-16 border border-latte-crust text-center shadow-sm">
-                        <div className="w-16 h-16 bg-latte-mauve/10 text-latte-mauve rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Send size={32} />
-                        </div>
-                        <h2 className="text-2xl font-black text-latte-text">Flight Entry</h2>
-                        <p className="text-latte-subtext mt-2">Scorecard entry is coming next...</p>
-                    </div>
-                )}
+                {activeTab === 'flights' && <FlightsView />}
             </main>
         </div>
     );

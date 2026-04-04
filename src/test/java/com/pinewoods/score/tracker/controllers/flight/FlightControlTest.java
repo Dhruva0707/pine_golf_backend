@@ -96,8 +96,8 @@ public class FlightControlTest {
     public void create_flight_success_admin() throws Exception {
         String adminToken = loginAndGetToken(adminUsername, adminPassword);
         String flightScores = "[" +
-                "{\"playerName\":\"player2\",\"score\":36, \"birdies\": 2}," +
-                "{\"playerName\":\"player1\",\"score\":32}" +
+                "{\"playerName\":\"player2\",\"score\":36, \"holeScores\": [4,4,4,4,4,4,4,4,4], \"birdies\": 2, \"courseName\": \"Test Course\"}," +
+                "{\"playerName\":\"player1\",\"holeScores\": [4,4,3,3,3,4,3,4,4], \"courseName\": \"Test Course\"}" +
                 "]";
 
         ResponseEntity<String> flightAdditionResponse = sendRequest(flightPath, flightScores, adminToken,
@@ -125,8 +125,10 @@ public class FlightControlTest {
         List<FlightScoreDTO> scores = retrievedFlight.flights();
 
         // Create expected score entries
-        FlightScoreDTO expectedScore1 = new FlightScoreDTO("player2", 36, 2);
-        FlightScoreDTO expectedScore2 = new FlightScoreDTO("player1", 32, 0);
+        FlightScoreDTO expectedScore1 = new FlightScoreDTO("player2", 36, 2,
+                List.of(4,4,4,4,4,4,4,4,4), "Test Course");
+        FlightScoreDTO expectedScore2 = new FlightScoreDTO("player1", 32, 0,
+                List.of(4,4,3,3,3,4,3,4,4), "Test Course");
 
         assertAll("Flight creation and retrieval",
             // Creation response

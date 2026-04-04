@@ -65,6 +65,7 @@ public class TournamentController {
                 course.getIndexes(),
                 request.getPointsMap(),
                 request.getHandicapMultiplier(),
+                request.getCourseName(),
                 playerRepository
         );
 
