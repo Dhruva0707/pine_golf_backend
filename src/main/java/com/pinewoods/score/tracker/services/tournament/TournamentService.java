@@ -196,6 +196,8 @@ public class TournamentService {
             FlightScore fs = FlightScore.builder()
                     .player(playerRepo.findByName(player.name()).orElseThrow())
                     .score(totalPoints)
+                    .holeScores(card.holeScores())
+                    .courseName(strategy.getCourseName())
                     .birdies(birdies)
                     .flight(flight) // Set back-reference
                     .build();
@@ -216,48 +218,32 @@ public class TournamentService {
     }
 
     private void allocatePoints(List<FlightScore> scoreboard, Tournament t, Map<Long, Integer> pointsMap) {
+        // 1. Group players by score and maintain the sorted order (Highest score first)
         Map<Integer, List<Player>> groups = scoreboard.stream()
                 .collect(Collectors.groupingBy(
                         FlightScore::getScore,
-                        LinkedHashMap::new, // Keep the sorted order
+                        LinkedHashMap::new,
                         Collectors.mapping(FlightScore::getPlayer, Collectors.toList())
                 ));
 
         List<List<Player>> rankedGroups = new ArrayList<>(groups.values());
 
-        List<Player> firstPlacePlayers = rankedGroups.get(0);
-        // If 3 people tie for 1st, they all get 100.
-        int firstPoints = 100 / firstPlacePlayers.size();
-        firstPlacePlayers.forEach(p -> {
-            t.getAwards().put(p.getId(), 1);
-            pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + firstPoints);
-        });
+        // Define our prize pools
+        int[] prizePools = {100, 66, 33};
 
-        if (rankedGroups.size() > 1 && firstPlacePlayers.size() == 1) {
-            // Only award 2nd place if there wasn't a tie for 1st that "consumed" the rank
-            List<Player> secondPlacePlayers = rankedGroups.get(1);
-            int secondPoints = 66 / secondPlacePlayers.size();
-            secondPlacePlayers.forEach(p -> {
-                t.getAwards().put(p.getId(), 2);
-                pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + secondPoints);
-            });
+        // 2. Iterate through the top 3 score groups (Rank 1, 2, and 3)
+        for (int i = 0; i < Math.min(rankedGroups.size(), 3); i++) {
+            List<Player> playersInRank = rankedGroups.get(i);
+            int rankLabel = i + 1; // 1, 2, or 3
+            int pointsToDistribute = prizePools[i] / playersInRank.size();
 
-            if (rankedGroups.size() > 2 && secondPlacePlayers.size() == 1) {
-                List<Player> thirdPlacePlayers = rankedGroups.get(2);
-                int thirdPoints = 33 / thirdPlacePlayers.size();
-                thirdPlacePlayers.forEach(p -> {
-                    t.getAwards().put(p.getId(), 3);
-                    pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + thirdPoints);
-                });
+            for (Player p : playersInRank) {
+                // Assign the award rank (1, 2, or 3)
+                t.getAwards().put(p.getId(), rankLabel);
+
+                // Add the points to the map
+                pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + pointsToDistribute);
             }
-        } else if (rankedGroups.size() > 1 && firstPlacePlayers.size() > 1) {
-            List<Player> thirdPlacePlayers = rankedGroups.get(1);
-            int thirdPoints = 33 / thirdPlacePlayers.size();
-            thirdPlacePlayers.forEach(p -> {
-                t.getAwards().put(p.getId(), 3);
-                pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + thirdPoints);
-
-            });
         }
     }
 
@@ -298,9 +284,7 @@ public class TournamentService {
         List<Flight> calculateFlights = calculatedFlightCache.get(tournament.getId());
         List<FlightScoreDTO> leaderBoard = new ArrayList<>();
         calculateFlights.forEach(f -> {
-            f.getFlightScores().forEach(fs ->
-                            leaderBoard.add(new FlightScoreDTO(fs.getPlayer().getName(), fs.getScore(), fs.getBirdies())
-                            ));
+            f.getFlightScores().forEach(fs -> leaderBoard.add(fs.toDto()));
         });
 
         return leaderBoard;

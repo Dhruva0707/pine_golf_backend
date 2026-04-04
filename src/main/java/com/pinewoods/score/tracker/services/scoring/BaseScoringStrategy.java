@@ -10,6 +10,12 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
     @Getter
     List<Integer> pars;
     List<Integer> indexes;
+    String courseName;
+
+    @Override
+    public String getCourseName() {
+        return courseName;
+    }
 
     @Override
     public int countBirdies(

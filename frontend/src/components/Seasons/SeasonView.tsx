@@ -27,6 +27,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         return [...seasons].sort((a, b) => b.localeCompare(a));
     }, [seasons]);
 
+    const sortedStandings = useMemo(() => {
+        return [...standings].sort((a, b) => b.points - a.points);
+    }, [standings]);
+
     useEffect(() => {
         fetchSeasons();
         fetchPlayers(); // Fetch players once on mount
@@ -195,20 +199,38 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-latte-crust">
-                                {standings.map((team, idx) => {
-                                    if (team.points !== lastPoints) {
-                                        currentRank = idx + 1;
-                                        lastPoints = team.points;
-                                    }
-                                    return (
-                                        <tr key={team.teamName} className="hover:bg-latte-base/10 transition-colors">
-                                            <td className="px-6 py-4 font-black text-latte-subtext">{currentRank}</td>
-                                            <td className="px-6 py-4 font-bold text-latte-text">{team.teamName}</td>
-                                            <td className="px-6 py-4 text-center font-black text-latte-mauve">{team.points}</td>
-                                            <td className="px-6 py-4 text-center text-latte-subtext text-sm">{team.wins}-{team.losses}-{team.draws}</td>
-                                        </tr>
-                                    );
-                                })}
+                                {(() => {
+                                    // Reset trackers for the render pass
+                                    let currentRank = 0;
+                                    let lastPoints = -1;
+
+                                    return sortedStandings.map((team, idx) => {
+                                        // If points are different from previous, update rank to the current position (1-indexed)
+                                        // If points are the same, they keep the same rank (Tied)
+                                        if (team.points !== lastPoints) {
+                                            currentRank = idx + 1;
+                                            lastPoints = team.points;
+                                        }
+
+                                        return (
+                                            <tr key={team.teamName} className="hover:bg-latte-base/10 transition-colors">
+                                                <td className="px-6 py-4 font-black text-latte-subtext">
+                                                    {/* Added a '#' prefix for visual clarity */}
+                                                    #{currentRank}
+                                                </td>
+                                                <td className="px-6 py-4 font-bold text-latte-text">
+                                                    {team.teamName}
+                                                </td>
+                                                <td className="px-6 py-4 text-center font-black text-latte-mauve">
+                                                    {team.points}
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-latte-subtext text-sm">
+                                                    {team.wins}-{team.losses}-{team.draws}
+                                                </td>
+                                            </tr>
+                                        );
+                                    });
+                                })()}
                                 </tbody>
                             </table>
                         </section>
