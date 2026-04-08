@@ -4,7 +4,8 @@ import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dao.tournament.TournamentRepository;
-import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
@@ -16,12 +17,9 @@ import com.pinewoods.score.tracker.entities.season.TeamStanding;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
-import com.pinewoods.score.tracker.services.flight.FlightService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -29,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class TournamentService {
     private final TournamentRepository tournamentRepo;
@@ -36,6 +35,7 @@ public class TournamentService {
     private final PlayerRepository playerRepo;
     private final TeamStandingRepository standingRepo;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
+    private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
 
     // ==================== Create Tournament ====================
      /**
@@ -44,7 +44,6 @@ public class TournamentService {
      * @param strategy scoring strategy
      * @return Tournament object created
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public Tournament createTournament(String name, String seasonName, IScoringStrategy strategy) {
         Season season = seasonRepo.findByName(seasonName)
@@ -79,7 +78,6 @@ public class TournamentService {
      * @param cards scorecards for the flight
      * @return FlightDTO representing the flight
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public Flight addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
         Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
@@ -90,20 +88,24 @@ public class TournamentService {
         }
 
         // Use our Strategy to transform ScoreCards into a Flight entity
-        Flight flight = strategy.calculateScores(cards);
+        Flight calculatedFlight = strategy.calculateScores(cards);
+        Flight flight = createFlight(cards, strategy);
         tournament.getFlights().add(flight);
 
         // update birdies in standing for each team
-        for (FlightScore fs : flight.getFlightScores()) {
+        for (FlightScore fs : calculatedFlight.getFlightScores()) {
             Team team = fs.getPlayer().getTeam();
             standingRepo.findBySeasonNameAndTeamName(tournament.getSeason().getName(), team.getName())
                     .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
         }
 
-        tournamentRepo.save(tournament); // Cascades to Flight and FlightScores
+        tournamentRepo.saveAndFlush(tournament); // Cascades to Flight and FlightScores
+
+        calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
+        calculatedFlightCache.get(tournamentId).add(calculatedFlight);
 
         // Convert to DTO for the frontend
-        return flight;
+        return calculatedFlight;
     }
 
     /**
@@ -111,23 +113,25 @@ public class TournamentService {
      *
      * @param tournamentId tournament id
      */
-    @Transactional
     @PreAuthorize( "hasRole('ADMIN')")
     public void endTournament(Long tournamentId) {
         Tournament tournament = tournamentRepo.findById(tournamentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tournament " + tournamentId + " not found"));
 
+        Map<Long, Integer> pointsMap = new HashMap<>();
+
         // Calculate the 100, 66, 33 points and specialty awards
-        calculateFinalAwards(tournament);
+        calculateFinalAwards(tournament, pointsMap);
 
         // Update Team Standings in the Season
-        updateTeamStandings(tournament);
+        updateTeamStandings(tournament, pointsMap);
 
         tournament.setFinished(true);
         tournamentRepo.save(tournament);
 
         // Cleanup: Memory is freed, Strategy is garbage collected
         activeStrategies.remove(tournamentId);
+        calculatedFlightCache.remove(tournamentId);
     }
 
     // ================= Get Tournament ==================
@@ -142,16 +146,14 @@ public class TournamentService {
 
         return tournamentRepo.findBySeasonId(season.getId())
                 .stream()
-                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
-                        t.getId(), t.getSeason().getId()))
+                .map(Tournament::toDTO)
                 .toList();
     }
 
     public List<TournamentDTO> getTournamentsByName(String name) {
         return tournamentRepo.findAllByName(name)
                 .stream()
-                .map(t -> new TournamentDTO(t.getName(), t.getAwards(),
-                        t.getId(), t.getSeason().getId()))
+                .map(Tournament::toDTO)
                 .toList();
     }
 
@@ -169,22 +171,52 @@ public class TournamentService {
     // ================ Delete Tournament ======================
     @PreAuthorize( "hasRole('ADMIN')")
     public void deleteTournament(Long tournamentId) {
-        tournamentRepo.deleteById(tournamentId);
+        Tournament tournament = tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
+        Season season = tournament.getSeason();
+        season.getTournaments().remove(tournament);
+        tournamentRepo.delete(tournament);
+        activeStrategies.remove(tournamentId);
     }
 
     // ============= Utilities =============
-    private void calculateFinalAwards(Tournament tournament) {
-        List<FlightScore> leaderboard = tournament.getFlights().stream()
+
+    private Flight createFlight(List<ScoreCardDTO> cards, IScoringStrategy strategy) {
+        Flight flight = Flight.builder()
+                .date(new Date())
+                .build();
+
+        for (ScoreCardDTO card : cards) {
+            PlayerDTO player = card.player();
+
+            // Perform the handicap/par/index math we discussed
+            int totalPoints = card.holeScores().stream().mapToInt(Integer::intValue).sum();
+            int birdies = strategy.countBirdies(card.holeScores());
+
+            FlightScore fs = FlightScore.builder()
+                    .player(playerRepo.findByName(player.name()).orElseThrow())
+                    .score(totalPoints)
+                    .birdies(birdies)
+                    .flight(flight) // Set back-reference
+                    .build();
+
+            flight.getFlightScores().add(fs);
+        }
+        return flight;
+    }
+
+    private void calculateFinalAwards(Tournament tournament, Map<Long, Integer> pointsMap) {
+        List<FlightScore> scoreboard = calculatedFlightCache.get(tournament.getId()).stream()
                 .flatMap(f -> f.getFlightScores().stream())
                 .sorted(Comparator.comparingInt(FlightScore::getScore).reversed())
                 .toList();
 
-        allocateRanks(leaderboard, tournament);
-        allocateBirdies(tournament, leaderboard);
+        allocatePoints(scoreboard, tournament, pointsMap);
+        allocateBirdies(scoreboard, tournament, pointsMap);
     }
 
-    private void allocateRanks(List<FlightScore> leaderboard, Tournament t) {
-        Map<Integer, List<Player>> groups = leaderboard.stream()
+    private void allocatePoints(List<FlightScore> scoreboard, Tournament t, Map<Long, Integer> pointsMap) {
+        Map<Integer, List<Player>> groups = scoreboard.stream()
                 .collect(Collectors.groupingBy(
                         FlightScore::getScore,
                         LinkedHashMap::new, // Keep the sorted order
@@ -196,53 +228,81 @@ public class TournamentService {
         List<Player> firstPlacePlayers = rankedGroups.get(0);
         // If 3 people tie for 1st, they all get 100.
         int firstPoints = 100 / firstPlacePlayers.size();
-        firstPlacePlayers.forEach(p -> t.getAwards().put(p.getId(), firstPoints));
+        firstPlacePlayers.forEach(p -> {
+            t.getAwards().put(p.getId(), 1);
+            pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + firstPoints);
+        });
 
         if (rankedGroups.size() > 1 && firstPlacePlayers.size() == 1) {
             // Only award 2nd place if there wasn't a tie for 1st that "consumed" the rank
             List<Player> secondPlacePlayers = rankedGroups.get(1);
             int secondPoints = 66 / secondPlacePlayers.size();
-            secondPlacePlayers.forEach(p -> t.getAwards().put(p.getId(), secondPoints));
+            secondPlacePlayers.forEach(p -> {
+                t.getAwards().put(p.getId(), 2);
+                pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + secondPoints);
+            });
 
             if (rankedGroups.size() > 2 && secondPlacePlayers.size() == 1) {
                 List<Player> thirdPlacePlayers = rankedGroups.get(2);
                 int thirdPoints = 33 / thirdPlacePlayers.size();
-                thirdPlacePlayers.forEach(p -> t.getAwards().put(p.getId(), thirdPoints));
+                thirdPlacePlayers.forEach(p -> {
+                    t.getAwards().put(p.getId(), 3);
+                    pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + thirdPoints);
+                });
             }
         } else if (rankedGroups.size() > 1 && firstPlacePlayers.size() > 1) {
             List<Player> thirdPlacePlayers = rankedGroups.get(1);
             int thirdPoints = 33 / thirdPlacePlayers.size();
-            thirdPlacePlayers.forEach(p -> t.getAwards().put(p.getId(), thirdPoints));
+            thirdPlacePlayers.forEach(p -> {
+                t.getAwards().put(p.getId(), 3);
+                pointsMap.put(p.getId(), pointsMap.getOrDefault(p.getId(), 0) + thirdPoints);
+
+            });
         }
     }
 
-    private void allocateBirdies(Tournament t, List<FlightScore> leaderboard) {
-        leaderboard.stream()
+    private void allocateBirdies(List<FlightScore> scoreboard, Tournament t, Map<Long, Integer> pointsMap) {
+        scoreboard.stream().filter(fs -> fs.getBirdies() > 0)
                 .max(Comparator.comparingInt(FlightScore::getBirdies))
-                .ifPresent(fs -> t.getAwards()
-                        .merge(fs.getPlayer().getId(), 50, Integer::sum));
+                .ifPresent(fs -> pointsMap.put(
+                        fs.getPlayer().getId(), pointsMap.getOrDefault(fs.getPlayer().getId(), 0) + 50));
     }
 
-    private void updateTeamStandings(Tournament tournament) {
+    private void updateTeamStandings(Tournament tournament, Map<Long, Integer> pointsMap) {
         Season season = tournament.getSeason();
-        tournament.getAwards().forEach((playerId, points) -> {
+        pointsMap.forEach((playerId, points) -> {
             Player player = playerRepo.findById(playerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Player with id " + playerId + " not found"));
             Team team = player.getTeam();
             if (!team.getName().equalsIgnoreCase("UNASSIGNED")) {
+                // Find existing standing for this team in this season, or create new
+                TeamStanding standing = standingRepo.findBySeasonNameAndTeamName(
+                        season.getName(), team.getName())
+                        .orElse(TeamStanding.builder().season(season).team(team).points(0).build());
 
-            // Find existing standing for this team in this season, or create new
-            TeamStanding standing = standingRepo.findBySeasonNameAndTeamName(
-                    season.getName(), team.getName())
-                    .orElse(TeamStanding.builder().season(season).team(team).points(0).build());
+                standing.setPoints(standing.getPoints() + points);
 
-            standing.setPoints(standing.getPoints() + points);
+                // update wins
+                standing.setWins(standing.getWins() + 1);
 
-            // update wins
-            standing.setWins(standing.getWins() + 1);
-
-            standingRepo.save(standing);
+                standingRepo.save(standing);
             }
         });
+    }
+
+    public List<FlightScoreDTO> getTournamentLeaderBoard(String seasonName, String tournamentName) {
+        Tournament tournament = getTournamentBySeasonAndName(seasonName, tournamentName);
+        if (tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament is already finished");
+        }
+        List<Flight> calculateFlights = calculatedFlightCache.get(tournament.getId());
+        List<FlightScoreDTO> leaderBoard = new ArrayList<>();
+        calculateFlights.forEach(f -> {
+            f.getFlightScores().forEach(fs ->
+                            leaderBoard.add(new FlightScoreDTO(fs.getPlayer().getName(), fs.getScore(), fs.getBirdies())
+                            ));
+        });
+
+        return leaderBoard;
     }
 }

@@ -2,10 +2,15 @@ package com.pinewoods.score.tracker.controllers.tournament;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtilities;
+import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
+import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
+import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import com.pinewoods.score.tracker.services.scoring.ScoringStrategyFactory;
 import com.pinewoods.score.tracker.services.tournament.TournamentService;
@@ -29,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/tournaments")
@@ -38,6 +44,8 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
     private final ScoringStrategyFactory strategyFactory;
+    private final PlayerRepository playerRepository;
+    private final CourseRepository courseRepository;
 
     @PostMapping("/start")
     @Operation(summary = "Create and start a new tournament session",
@@ -47,13 +55,17 @@ public class TournamentController {
             @ApiResponse(responseCode = "404", description = "Season not found")
     })
     public ResponseEntity<TournamentDTO> startTournament(@Valid @RequestBody TournamentCreateRequest request) {
+        Course course = courseRepository.findByName(request.courseName)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+
         // Build the strategy instance from request data
         IScoringStrategy strategy = strategyFactory.getStrategy(
                 request.getStrategyType(),
-                request.getPars(),
-                request.getIndexes(),
+                course.getPars(),
+                course.getIndexes(),
                 request.getPointsMap(),
-                request.getHandicapMultiplier()
+                request.getHandicapMultiplier(),
+                playerRepository
         );
 
         Tournament tournament = tournamentService.createTournament(
@@ -102,6 +114,24 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
     }
 
+    @GetMapping("/{seasonName}/{tournamentName}/leaderBoard")
+    @Operation(summary = "Get the current tournament's leaderboard")
+    public ResponseEntity<List<FlightScoreDTO>> getLeaderBoard(@PathVariable("tournamentName") String tournamentName,
+                                                               @PathVariable("seasonName") String seasonName) {
+        return ResponseEntity.ok(tournamentService.getTournamentLeaderBoard(seasonName, tournamentName));
+    }
+
+    // ------------ Delete Tournament -----------
+    @DeleteMapping("/{seasonName}/{tournamentName}")
+    @Operation(summary = "Delete a tournament by name")
+    public ResponseEntity<Void> deleteTournament(@PathVariable("tournamentName") String tournamentName,
+                                                 @PathVariable("seasonName") String seasonName) {
+        Tournament t = tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName);
+        Long id = t.getId();
+        tournamentService.deleteTournament(id);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
 
     // ------------ DTO's ----------
     @Data
@@ -116,14 +146,12 @@ public class TournamentController {
         @JsonProperty("strategy_type")
         @NotBlank
         private String strategyType; // "STABLEFORD", "STROKEPLAY", etc.
-        @JsonProperty("pars")
-        @Size(min = 18, max = 18) private List<Integer> pars;
-        @JsonProperty("indexes")
-        @Size(min = 18, max = 18) private List<Integer> indexes;
-        @JsonProperty("points_map")
+        @JsonProperty("courseName")
+        private String courseName;
+        @JsonProperty("pointsMap")
         @NotEmpty
         private Map<Integer, Integer> pointsMap;
-        @JsonProperty("handicap_multiplier")
+        @JsonProperty("handicapMultiplier")
         private double handicapMultiplier;
     }
 }

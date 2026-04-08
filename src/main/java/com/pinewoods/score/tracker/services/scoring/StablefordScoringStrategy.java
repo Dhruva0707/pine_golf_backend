@@ -1,9 +1,12 @@
 package com.pinewoods.score.tracker.services.scoring;
 
+import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
+import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -13,9 +16,11 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
 
     final Map<Integer, Integer> pointsMap;
     final double handicapMultiplier;
+    PlayerRepository playerRepo;
 
     public StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
-                                     Map<Integer, Integer> pointsMap, double handicapMultiplier) {
+                                     Map<Integer, Integer> pointsMap, double handicapMultiplier,
+                                     PlayerRepository playerRepo) {
         if (pars.size() != 18 || indexes.size() != 18) {
             throw new IllegalArgumentException("Pars and indexes must be of length 18");
         }
@@ -24,6 +29,7 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
         this.indexes = indexes;
         this.pointsMap = pointsMap;
         this.handicapMultiplier = handicapMultiplier;
+        this.playerRepo = playerRepo;
     }
 
     @Override
@@ -33,15 +39,15 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
                 .build();
 
         for (ScoreCardDTO card : cards) {
-            Player player = card.player();
-            int handicap = (int) Math.round(Math.round(player.getHandicap() * handicapMultiplier));
+            PlayerDTO player = card.player();
+            int handicap = (int) Math.round(Math.round(player.handicap() * handicapMultiplier));
 
             // Perform the handicap/par/index math we discussed
-            int totalPoints = calculateScore(card.holeScores(), player.getHandicap());
+            int totalPoints = calculateScore(card.holeScores(), handicap);
             int birdies = countBirdies(card.holeScores());
 
             FlightScore fs = FlightScore.builder()
-                    .player(player)
+                    .player(playerRepo.findByName(player.name()).orElseThrow())
                     .score(totalPoints)
                     .birdies(birdies)
                     .flight(flight) // Set back-reference
