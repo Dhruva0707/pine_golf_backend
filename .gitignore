@@ -9,7 +9,6 @@ build/
 /target
 *.log
 *.class
-*.jar
 *.war
 *.iml
 .idea/
