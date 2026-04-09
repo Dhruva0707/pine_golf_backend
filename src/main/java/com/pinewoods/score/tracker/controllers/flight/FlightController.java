@@ -66,4 +66,9 @@ public class FlightController {
     public ResponseEntity<FlightDTO> getFlight(@PathVariable long id) {
         return ResponseEntity.ok(flightService.getFlight(id).toDTO());
     }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<FlightDTO>> getAllFlights() {
+        return ResponseEntity.ok(flightService.getAllFlights().stream().map(Flight::toDTO).toList());
+    }
 }

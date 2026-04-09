@@ -15,4 +15,6 @@ public interface IScoringStrategy {
     int countBirdies(
             @NotNull @Size(min = 18, max = 18, message = "Exactly 18 hole scores must be provided.")
             List<Integer> scores);
+
+    String getCourseName();
 }

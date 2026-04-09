@@ -64,7 +64,9 @@ public class FlightService {
 
                     return FlightScore.builder()
                             .player(player)
-                            .score(dto.score())
+                            .holeScores(dto.holeScores())
+                            .courseName(dto.courseName())
+                            .score(dto.holeScores().stream().mapToInt(Integer::intValue).sum())
                             .flight(flight)
                             .birdies(dto.birdies() != null ?  dto.birdies() : 0)
                             .build();
@@ -81,5 +83,9 @@ public class FlightService {
     public Flight getFlight(long id) {
         return flightRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Flight not found: " + id));
+    }
+
+    public List<Flight> getAllFlights() {
+        return flightRepository.findAll();
     }
 }
