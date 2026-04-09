@@ -25,6 +25,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import static org.springframework.http.HttpMethod.OPTIONS;
+
 @Configuration
 @EnableMethodSecurity(securedEnabled = true)
 public class SecurityConfig {
@@ -60,6 +62,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configure(http))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/auth/**",          // allow login/signup
                                 "/swagger-ui/**",    // allow Swagger UI resources
