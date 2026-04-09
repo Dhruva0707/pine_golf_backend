@@ -2,16 +2,14 @@ package com.pinewoods.score.tracker.config;
 
 import com.pinewoods.score.tracker.config.security.JwtAuthenticationFilter;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
-import com.pinewoods.score.tracker.entities.admin.Player;
-import java.util.Optional;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNullApi;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -30,6 +28,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 @EnableMethodSecurity(securedEnabled = true)
 public class SecurityConfig {
+
+    @Value("${ALLOWED_ORIGINS:http://localhost:3000}")
+    private String allowedOrigins;
+
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -91,7 +93,7 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**") // Apply to all endpoints
-                        .allowedOrigins("http://localhost:3000", "https://pinewoods-golf.koyeb.app") // Allow your React app
+                        .allowedOrigins(allowedOrigins.split(",")) // Allow your React app
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
