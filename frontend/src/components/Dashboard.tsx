@@ -46,7 +46,7 @@ export const Dashboard = () => {
             <header className="bg-white border-b border-latte-crust px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-latte-green rounded-xl flex items-center justify-center text-white shadow-md">
-                        <img src="/logo.png" alt="Pinewoods logo" size={20} />
+                        <img src="/logo.png" alt="Pinewoods logo" width={20} height={20}/>
                     </div>
                     <div className="flex flex-col">
                         <span className="font-black text-lg leading-tight uppercase tracking-tight">Fairway</span>
