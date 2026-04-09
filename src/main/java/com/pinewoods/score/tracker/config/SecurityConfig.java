@@ -91,7 +91,7 @@ public class SecurityConfig {
 
         // Define allowed methods and headers explicitly
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
 
         // This MUST be true for the frontend to send JWTs or cookies
         configuration.setAllowCredentials(true);
