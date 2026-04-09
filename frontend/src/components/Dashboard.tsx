@@ -46,8 +46,13 @@ export const Dashboard = () => {
             {/* --- NAVIGATION HEADER --- */}
             <header className="bg-white border-b border-latte-crust px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-latte-green rounded-xl flex items-center justify-center text-white shadow-md">
-                        <img src="/logo.png" alt="Pinewoods logo" size={20} />
+                    {/* We removed bg-latte-green and padding from the img. p-1 adds a small, clean gap. */}
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shadow-md">
+                        <img
+                            src="/logo.png"
+                            alt="Pinewoods logo"
+                            className="w-full h-full object-cover p-1"
+                        />
                     </div>
                     <div className="flex flex-col">
                         <span className="font-black text-lg leading-tight uppercase tracking-tight">Fairway</span>

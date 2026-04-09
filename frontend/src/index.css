@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+    /* Catppuccin Latte Palette */
+    --color-latte-base: #eff1f5;     /* Main Background */
+    --color-latte-mantle: #e6e9ef;   /* Secondary Background */
+    --color-latte-crust: #dce0e8;    /* Borders / Dividers */
+    --color-latte-text: #4c4f69;     /* Main Text */
+    --color-latte-subtext: #6c6f85;  /* Muted Text */
+    --color-latte-mauve: #8839ef;    /* Primary Accent */
+    --color-latte-blue: #1e66f5;     /* Links/Buttons */
+    --color-latte-green: #40a02b;    /* Success/Golf Course vibe */
+    --color-latte-red: #d20f39;      /* Errors/Logout */
+
+    --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, Consolas, monospace;
+}
+
+:root {
+    background-color: var(--color-latte-base);
+    color: var(--color-latte-text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+}
+
+/* Remove the rigid 1126px width for a responsive dashboard */
+#root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Typography matching your original style but with Latte colors */
+h1, h2, h3 {
+    color: var(--color-latte-text);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+code {
+    font-family: var(--font-mono);
+    background-color: var(--color-latte-mantle);
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* Custom Scrollbar for a polished look */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--color-latte-base);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--color-latte-crust);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-latte-subtext);
+}
