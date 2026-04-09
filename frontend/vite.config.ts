@@ -17,6 +17,7 @@ export default defineConfig({
     preview: {
         port: Number(process.env.PORT) || 3000,
         strictPort: true,
-        host: true // Crucial for cloud visibility
+        host: true, // Crucial for cloud visibility
+        allowedHosts: true
     }
 })
