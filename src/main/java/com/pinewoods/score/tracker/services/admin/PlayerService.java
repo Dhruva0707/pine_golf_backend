@@ -4,8 +4,8 @@ import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.admin.TeamRepository;
 import com.pinewoods.score.tracker.dao.flight.FlightScoreRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.dto.admin.UpdatePlayerRequest;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
-import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.admin.Role;
 import com.pinewoods.score.tracker.entities.admin.Team;
@@ -14,11 +14,7 @@ import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
-import com.pinewoods.score.tracker.services.flight.FlightService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -186,15 +182,27 @@ public class PlayerService {
         return createPlayerDTO(player);
     }
 
-    @PreAuthorize("hasRole('ADMIN') or authentication.name == #playerName")
-    public PlayerDTO updatePlayerPassword(String playerName, String rawPassword) {
-        Player player = playerRepository.findByName(playerName)
-            .orElseThrow(() -> new ResourceNotFoundException("Player with name " + playerName + " does not exist."));
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN') or authentication.name == #currentName")
+    public PlayerDTO updatePlayer(String currentName, UpdatePlayerRequest request) {
+        Player player = playerRepository.findByName(currentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Player not found"));
 
-        String encodedPassword = passwordEncoder.encode(rawPassword);
-        player.setPassword(encodedPassword);
-        playerRepository.save(player);
-        return createPlayerDTO(player);
+        // Handle Name Change
+        if (request.newName() != null && !request.newName().isBlank()) {
+            if (!request.newName().equals(player.getName()) && playerRepository.existsByName(request.newName())) {
+                throw new ResourceConflictException("Name already taken: " + request.newName());
+            }
+            player.setName(request.newName());
+        }
+
+        // Handle Password Change (if provided in the same request)
+        if (request.password() != null && !request.password().isBlank()) {
+            player.setPassword(passwordEncoder.encode(request.password()));
+        }
+
+        Player saved = playerRepository.save(player);
+        return createPlayerDTO(saved);
     }
 
     // ----------- Delete Player -----------
