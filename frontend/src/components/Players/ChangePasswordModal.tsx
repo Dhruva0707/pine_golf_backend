@@ -14,7 +14,6 @@ export const ChangePasswordModal = ({ isOpen, onClose, playerName }: ChangePassw
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // FIX: Sending an object { password: "..." } to match the DTO
             await api.put(`/players/${encodeURIComponent(playerName)}/password`, {
                 password: password
             });

@@ -92,58 +92,33 @@ public class PlayerController {
     // -------- Update Methods --------
 
     @Operation(
-        summary = "Update player team",
-        description = "Assigns a player to a different team. **Role required: ADMIN**",
-        security = @SecurityRequirement(name = "bearerAuth")
-    )
-    @PutMapping("/{name}/team")
-    public ResponseEntity<PlayerDTO> updatePlayerTeam(
-        @PathVariable String name,
-        @RequestBody String teamName) {
-
-        PlayerDTO result = playerService.updatePlayerTeam(name, teamName);
-
-        return ResponseEntity.ok(result);
-    }
-
-    @Operation(
-            summary = "Update player handicap",
-            description = "Updates the numerical handicap for a player. **Role required: ADMIN**",
+            summary = "Update player profile (Name, Handicap, Team)",
+            description = "Updates core player data. **Role required: ADMIN**",
             security = @SecurityRequirement(name = "bearerAuth")
     )
-    @PutMapping("/{name}/handicap")
-    public ResponseEntity<PlayerDTO> updatePlayerHandicap(
-        @PathVariable String name,
-        @RequestBody Integer handicap) {
-
-        PlayerDTO result = playerService.updatePlayerHandicap(name, handicap);
-        return ResponseEntity.ok(result);
-    }
-
     @PutMapping("/{name}")
-    @Operation(summary = "Update player name")
     public ResponseEntity<PlayerDTO> updatePlayer(
             @PathVariable String name,
             @RequestBody UpdatePlayerRequest request) {
-        // This will now match the JSON object from React
-        PlayerDTO result = playerService.updatePlayer(name, request);
+
+        PlayerDTO result = playerService.updatePlayerProfile(name, request);
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/{name}/password")
     @Operation(
             summary = "Change player password",
-            description = "Updates the password for a player. Can be performed by the player themselves or an Admin.",
+            description = "Updates the password. Can be performed by the player themselves or an Admin.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
+    @PutMapping("/{name}/password")
     public ResponseEntity<PlayerDTO> updatePassword(
             @PathVariable String name,
             @RequestBody UpdatePlayerRequest request) {
-        // Re-using the same logic
-        PlayerDTO result = playerService.updatePlayer(name, request);
+
+        // Extract just the password from the DTO
+        PlayerDTO result = playerService.updatePlayerPassword(name, request.password());
         return ResponseEntity.ok(result);
     }
-
 
     // -------- Delete Methods --------
 
