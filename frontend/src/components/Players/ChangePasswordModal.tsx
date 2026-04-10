@@ -14,14 +14,16 @@ export const ChangePasswordModal = ({ isOpen, onClose, playerName }: ChangePassw
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Controller expects raw string, so we send password directly
-            await api.put(`/players/${playerName}/password`, password, {
-                headers: { 'Content-Type': 'application/json' }
+            // FIX: Sending an object { password: "..." } to match the DTO
+            await api.put(`/players/${encodeURIComponent(playerName)}/password`, {
+                password: password
             });
             setPassword('');
             onClose();
             alert("Password updated successfully");
-        } catch (err) { alert("Failed to update password"); }
+        } catch (err) {
+            alert("Failed to update password. Check admin permissions.");
+        }
     };
 
     if (!isOpen) return null;

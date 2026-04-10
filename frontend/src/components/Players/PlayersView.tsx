@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Trash2, User, Plus, Search, Lock, Edit2 } from 'lucide-react';
+import { Trash2, User, Plus, Search, Lock, Edit2, UserRoundPen } from 'lucide-react';
 import api from '../../api/client';
 import { AddPlayerModal } from './AddPlayerModal.tsx';
 import { ChangePasswordModal } from './ChangePasswordModal.tsx';
+import { ChangePlayerNameModal } from './ChangePlayerNameModal.tsx'; // Ensure this filename matches your file
 
 interface Player {
     id: number;
@@ -26,6 +27,7 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     // Modal States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+    const [isNameModalOpen, setIsNameModalOpen] = useState(false);
     const [selectedPlayerName, setSelectedPlayerName] = useState('');
 
     // 2. DATA FETCHING
@@ -49,15 +51,15 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
         fetchData();
     }, []);
 
-    // 3. ACTION HANDLERS (Matching your Controller Endpoints)
+    // 3. ACTION HANDLERS
 
     const handleUpdateHandicap = async (name: string, current: number) => {
         const newVal = window.prompt(`Update handicap for ${name}:`, current.toString());
         if (newVal === null || newVal === "") return;
 
         try {
-            // Controller expects @RequestBody Integer
-            await api.put(`/players/${name}/handicap`, parseInt(newVal), {
+            // Encode name for URL and send number directly (Spring @RequestBody Integer)
+            await api.put(`/players/${encodeURIComponent(name)}/handicap`, parseInt(newVal), {
                 headers: { 'Content-Type': 'application/json' }
             });
             fetchData();
@@ -68,8 +70,8 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
 
     const handleUpdateTeam = async (playerName: string, teamName: string) => {
         try {
-            // Controller expects @RequestBody String teamName
-            await api.put(`/players/${playerName}/team`, teamName, {
+            // Wrap string in quotes for Spring's Jackson @RequestBody String
+            await api.put(`/players/${encodeURIComponent(playerName)}/team`, JSON.stringify(teamName), {
                 headers: { 'Content-Type': 'application/json' }
             });
             fetchData();
@@ -81,7 +83,7 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     const handleDelete = async (player: Player) => {
         if (window.confirm(`Permanently delete ${player.name}?`)) {
             try {
-                await api.delete(`/players/${player.name}`);
+                await api.delete(`/players/${encodeURIComponent(player.name)}`);
                 fetchData();
             } catch (err) {
                 alert("Could not delete player. They may have active scores.");
@@ -142,15 +144,24 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                             <td className="px-8 py-5 font-bold text-latte-text">
                                 <div className="flex items-center gap-3">
                                     <User size={16} className="text-latte-subtext" />
-                                    {p.name}
+                                    <span>{p.name}</span>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => { setSelectedPlayerName(p.name); setIsNameModalOpen(true); }}
+                                            className="text-latte-subtext hover:text-latte-blue transition-colors"
+                                            title="Change Name"
+                                        >
+                                            <UserRoundPen size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             </td>
 
                             <td className="px-8 py-5">
                                 <div className="flex items-center gap-2">
-                                        <span className="bg-latte-base px-3 py-1 rounded-lg font-mono font-bold text-latte-blue">
-                                            {p.handicap}
-                                        </span>
+                                    <span className="bg-latte-base px-3 py-1 rounded-lg font-mono font-bold text-latte-blue">
+                                        {p.handicap}
+                                    </span>
                                     {isAdmin && (
                                         <button
                                             onClick={() => handleUpdateHandicap(p.name, p.handicap)}
@@ -171,7 +182,7 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                                     >
                                         <option value="">Independent</option>
                                         {teams.map(t => (
-                                            <option key={t.name} value={t.name}>{t.name}</option>
+                                            <option key={t.id} value={t.name}>{t.name}</option>
                                         ))}
                                     </select>
                                 ) : (
@@ -181,7 +192,6 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
 
                             <td className="px-8 py-5">
                                 <div className="flex items-center justify-center gap-3">
-                                    {/* Password Reset: Visible to Admin OR the Player themselves */}
                                     {(isAdmin || currentUserName === p.name) && (
                                         <button
                                             onClick={() => { setSelectedPlayerName(p.name); setIsPassModalOpen(true); }}
@@ -213,13 +223,20 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
             <AddPlayerModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                onSuccess={fetchData} // Refresh the list after adding
+                onSuccess={fetchData}
             />
 
             <ChangePasswordModal
                 isOpen={isPassModalOpen}
                 onClose={() => setIsPassModalOpen(false)}
                 playerName={selectedPlayerName}
+            />
+
+            <ChangePlayerNameModal
+                isOpen={isNameModalOpen}
+                onClose={() => setIsNameModalOpen(false)}
+                currentName={selectedPlayerName}
+                onSuccess={fetchData}
             />
         </div>
     );

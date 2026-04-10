@@ -1,6 +1,7 @@
 package com.pinewoods.score.tracker.controllers.admin;
 
 import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtilities;
+import com.pinewoods.score.tracker.dto.admin.UpdatePlayerRequest;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.services.admin.PlayerService;
@@ -119,17 +120,27 @@ public class PlayerController {
         return ResponseEntity.ok(result);
     }
 
+    @PutMapping("/{name}")
+    @Operation(summary = "Update player name")
+    public ResponseEntity<PlayerDTO> updatePlayer(
+            @PathVariable String name,
+            @RequestBody UpdatePlayerRequest request) {
+        // This will now match the JSON object from React
+        PlayerDTO result = playerService.updatePlayer(name, request);
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/{name}/password")
     @Operation(
             summary = "Change player password",
             description = "Updates the password for a player. Can be performed by the player themselves or an Admin.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
-    @PutMapping("/{name}/password")
-    public ResponseEntity<PlayerDTO> updatePlayerPassword(
-        @PathVariable String name,
-        @RequestBody String rawPassword) {
-
-        PlayerDTO result = playerService.updatePlayerPassword(name, rawPassword);
+    public ResponseEntity<PlayerDTO> updatePassword(
+            @PathVariable String name,
+            @RequestBody UpdatePlayerRequest request) {
+        // Re-using the same logic
+        PlayerDTO result = playerService.updatePlayer(name, request);
         return ResponseEntity.ok(result);
     }
 
