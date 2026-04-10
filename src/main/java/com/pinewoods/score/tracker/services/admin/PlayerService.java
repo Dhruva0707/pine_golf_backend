@@ -139,70 +139,38 @@ public class PlayerService {
 
     //----------- Update Player -----------
 
-    /**
-     * Updates the team of a player.
-     * Only users with the ADMIN role can perform this operation.
-     *
-     * @param playerName name of the player to update
-     * @param teamName name of the new team
-     * @return PlayerDTO representing the updated player
-     * @throws ResourceNotFoundException if the player or team does not exist
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    public PlayerDTO updatePlayerTeam(String playerName, String teamName) {
-        Player player = playerRepository.findByName(playerName)
-            .orElseThrow(() -> new ResourceNotFoundException("Player with name " + playerName + " does not exist."));
-
-        Team team = teamRepository.findByName(teamName)
-                .orElseThrow(() -> new ResourceNotFoundException("Team with name " + teamName + " does not exist."));
-
-        player.setTeam(team);
-        playerRepository.save(player);
-
-        return createPlayerDTO(player);
-    }
-
-    /**
-     * Updates the handicap of a player.
-     * Only users with the ADMIN role can perform this operation.
-     *
-     * @param playerName name of the player to update
-     * @param handicap new handicap value
-     * @return PlayerDTO representing the updated player
-     * @throws ResourceNotFoundException if the player does not exist
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    public PlayerDTO updatePlayerHandicap(String playerName, int handicap) {
-        Player player = playerRepository.findByName(playerName)
-            .orElseThrow(() -> new ResourceNotFoundException("Player with name " + playerName + " does not exist."));
-
-        player.setHandicap(handicap);
-        playerRepository.save(player);
-
-        return createPlayerDTO(player);
-    }
-
     @Transactional
-    @PreAuthorize("hasRole('ADMIN') or authentication.name == #currentName")
-    public PlayerDTO updatePlayer(String currentName, UpdatePlayerRequest request) {
+    @PreAuthorize("hasRole('ADMIN')") // Strict Admin Only
+    public PlayerDTO updatePlayerProfile(String currentName, UpdatePlayerRequest request) {
         Player player = playerRepository.findByName(currentName)
                 .orElseThrow(() -> new ResourceNotFoundException("Player not found"));
 
-        // Handle Name Change
-        if (request.newName() != null && !request.newName().isBlank()) {
+        if (request.newName() != null) {
             if (!request.newName().equals(player.getName()) && playerRepository.existsByName(request.newName())) {
-                throw new ResourceConflictException("Name already taken: " + request.newName());
+                throw new ResourceConflictException("Name taken");
             }
             player.setName(request.newName());
         }
 
-        // Handle Password Change (if provided in the same request)
-        if (request.password() != null && !request.password().isBlank()) {
-            player.setPassword(passwordEncoder.encode(request.password()));
+        if (request.handicap() != null) player.setHandicap(request.handicap());
+
+        if (request.teamName() != null) {
+            Team team = teamRepository.findByName(request.teamName())
+                    .orElseThrow(() -> new ResourceNotFoundException("Team not found"));
+            player.setTeam(team);
         }
 
-        Player saved = playerRepository.save(player);
-        return createPlayerDTO(saved);
+        return createPlayerDTO(playerRepository.save(player));
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN') or authentication.name == #currentName")
+    public PlayerDTO updatePlayerPassword(String currentName, String newPassword) {
+        Player player = playerRepository.findByName(currentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Player not found"));
+
+        player.setPassword(passwordEncoder.encode(newPassword));
+        return createPlayerDTO(playerRepository.save(player));
     }
 
     // ----------- Delete Player -----------

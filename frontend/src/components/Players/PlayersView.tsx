@@ -3,7 +3,7 @@ import { Trash2, User, Plus, Search, Lock, Edit2, UserRoundPen } from 'lucide-re
 import api from '../../api/client';
 import { AddPlayerModal } from './AddPlayerModal.tsx';
 import { ChangePasswordModal } from './ChangePasswordModal.tsx';
-import { ChangePlayerNameModal } from './ChangePlayerNameModal.tsx'; // Ensure this filename matches your file
+import { ChangePlayerNameModal } from './ChangePlayerNameModal.tsx';
 
 interface Player {
     id: number;
@@ -52,31 +52,39 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     }, []);
 
     // 3. ACTION HANDLERS
-
     const handleUpdateHandicap = async (name: string, current: number) => {
         const newVal = window.prompt(`Update handicap for ${name}:`, current.toString());
-        if (newVal === null || newVal === "") return;
+
+        // Check if user cancelled or entered nothing
+        if (newVal === null || newVal.trim() === "") return;
+
+        const parsedHandicap = parseFloat(newVal);
+        if (isNaN(parsedHandicap)) {
+            alert("Please enter a valid number (e.g., 12.5)");
+            return;
+        }
 
         try {
-            // Encode name for URL and send number directly (Spring @RequestBody Integer)
-            await api.put(`/players/${encodeURIComponent(name)}/handicap`, parseInt(newVal), {
-                headers: { 'Content-Type': 'application/json' }
+            // Pointing to /players/{name} (Admin Only)
+            // Sending an object { handicap: ... } to match your UpdatePlayerRequest DTO
+            await api.put(`/players/${encodeURIComponent(name)}`, {
+                handicap: parsedHandicap
             });
             fetchData();
         } catch (err) {
-            alert("Failed to update handicap. Ensure it is a whole number.");
+            alert("Failed to update handicap. Make sure you have Admin permissions.");
         }
     };
 
     const handleUpdateTeam = async (playerName: string, teamName: string) => {
         try {
-            // Wrap string in quotes for Spring's Jackson @RequestBody String
-            await api.put(`/players/${encodeURIComponent(playerName)}/team`, JSON.stringify(teamName), {
-                headers: { 'Content-Type': 'application/json' }
+            // Pointing to the main profile update endpoint
+            await api.put(`/players/${encodeURIComponent(playerName)}`, {
+                teamName: teamName
             });
             fetchData();
         } catch (err) {
-            alert("Failed to update team.");
+            alert("Update failed.");
         }
     };
 
