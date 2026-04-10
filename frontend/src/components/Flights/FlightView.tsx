@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { Send, History, Plus, Calendar, Target, User, Search, X } from 'lucide-react';
 import api from '../../api/client';
 
@@ -22,6 +23,8 @@ export const FlightsView = () => {
     const [searchPlayer, setSearchPlayer] = useState('');
     const [loading, setLoading] = useState(false);
     const [players, setPlayers] = useState<string[]>([]);
+    const [courses, setCourses] = useState<any[]>([]);
+    const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
     // Form State for New Flight
     const [courseName, setCourseName] = useState('');
@@ -34,7 +37,7 @@ export const FlightsView = () => {
         try {
             // If playerName exists, hit the specific player endpoint, else hit global flights
             const url = playerName
-                ? `/players/${playerName}/flights`
+                ? `/players/${encodeURIComponent(playerName)}/flights`
                 : `/flights/all`;
 
             const res = await api.get(url);
@@ -64,10 +67,43 @@ export const FlightsView = () => {
         }
     };
 
+    const fetchCourses = async () => {
+        try {
+            const res = await api.get('/courses');
+            setCourses(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('Failed to fetch courses', err);
+            setCourses([]);
+        }
+    };
+
     useEffect(() => {
-        // Initial load (global)
-        fetchFlights();
-        fetchPlayers();
+        // Initial load: try to default to signed-in user
+        const token = localStorage.getItem('golf_token');
+        const doInitialFetches = (name?: string) => {
+            if (name) {
+                setSearchPlayer(name);
+                fetchFlights(name);
+            } else {
+                fetchFlights();
+            }
+            fetchPlayers();
+            fetchCourses();
+        };
+        if (token) {
+            try {
+                const decoded: any = jwtDecode(token);
+                const name = decoded?.sub as string | undefined;
+                setCurrentUserName(name ?? null);
+                doInitialFetches(name);
+            } catch (e) {
+                console.warn('Failed to decode token', e);
+                setCurrentUserName(null);
+                doInitialFetches();
+            }
+        } else {
+            doInitialFetches();
+        }
     }, []);
 
     const handleSearch = (e: React.FormEvent) => {
@@ -82,6 +118,10 @@ export const FlightsView = () => {
 
     const handleSubmitFlight = async () => {
         if (!courseName || !targetPlayer) return alert("Course and Player Name are required");
+        const courseExists = courses.some((c: any) => c?.name === courseName);
+        if (!courseExists) return alert("Please select a valid course from the list.");
+        const playerExists = players.includes(targetPlayer);
+        if (!playerExists) return alert("Please select a valid player from the list.");
 
         const totalScore = holes.reduce((a, b) => a + (Number(b) || 0), 0);
         const payload: FlightScoreDTO[] = [{
@@ -102,6 +142,24 @@ export const FlightsView = () => {
             fetchFlights();
         } catch (err) { alert("Error saving flight."); }
     };
+
+    // When switching to add view, prefill scores with base 3s like tournament and default player
+    useEffect(() => {
+        if (view === 'add') {
+            setHoles(new Array(18).fill(3));
+            // Default player selection to signed-in user when available
+            if (currentUserName && players.includes(currentUserName)) {
+                setTargetPlayer(currentUserName);
+            }
+        }
+    }, [view]);
+
+    // If players or current user info arrives later, ensure default target player in Add view
+    useEffect(() => {
+        if (view === 'add' && !targetPlayer && currentUserName && players.includes(currentUserName)) {
+            setTargetPlayer(currentUserName);
+        }
+    }, [players, currentUserName]);
 
     return (
         <div className="space-y-6">
@@ -176,10 +234,13 @@ export const FlightsView = () => {
                         flights.map((f, i) => {
                             // Only show flights that have at least one available player entry (and respect search filter)
                             const allEntries = (f.flights || []).filter(fs => fs && fs.playerName);
-                            const entries = searchPlayer ? allEntries.filter(fs => fs.playerName === searchPlayer) : allEntries;
-                            if (entries.length === 0) return null;
+                            const containsSelected = searchPlayer ? allEntries.some(fs => fs.playerName === searchPlayer) : true;
+                            if (!containsSelected || allEntries.length === 0) return null;
 
-                            const course = entries[0]?.courseName || allEntries[0]?.courseName || '';
+                            // Show the entire flight (all players), even when a player is selected
+                            const entries = allEntries;
+
+                            const course = allEntries[0]?.courseName || '';
 
                             return (
                                 <div key={i} className="bg-white rounded-2xl border border-latte-crust shadow-sm overflow-hidden hover:border-latte-mauve transition-colors">
@@ -238,21 +299,34 @@ export const FlightsView = () => {
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <div>
                             <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Player Name</label>
-                            <input
+                            <select
                                 value={targetPlayer}
                                 onChange={(e) => setTargetPlayer(e.target.value)}
                                 className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
-                                placeholder="e.g. Tiger Woods"
-                            />
+                            >
+                                <option value="" disabled>Select a player...</option>
+                                {players.map((p) => (
+                                    <option key={p} value={p}>{p}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Course</label>
-                            <input
+                            <select
                                 value={courseName}
-                                onChange={(e) => setCourseName(e.target.value)}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCourseName(val);
+                                    // Auto-fill base scores like tournament (3s)
+                                    setHoles(new Array(18).fill(3));
+                                }}
                                 className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
-                                placeholder="Pebble Beach"
-                            />
+                            >
+                                <option value="" disabled>Select a course...</option>
+                                {courses.map((c: any) => (
+                                    <option key={c.name} value={c.name}>{c.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
