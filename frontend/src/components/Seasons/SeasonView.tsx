@@ -39,9 +39,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const fetchSeasons = async () => {
         const res = await api.get('/seasons');
         setSeasons(res.data);
-        if (res.data.length > 0 && !selectedSeason) {
+        if (res.data.length > 0) {
             const sorted = [...res.data].sort((a, b) => b.localeCompare(a));
-            setSelectedSeason(sorted[0]);
+            // Use functional update to avoid overriding a user selection made after this async call started
+            setSelectedSeason(prev => prev ?? sorted[0]);
         }
     };
 

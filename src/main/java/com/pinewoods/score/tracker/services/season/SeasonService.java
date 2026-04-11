@@ -35,7 +35,7 @@ public class SeasonService {
     public Season createSeason(String name) {
         String seasonName = new Date().toInstant()
                 .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + "_" + name;
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + "_" + name;
         Season season = Season.builder()
                 .name(seasonName)
                 .build();
