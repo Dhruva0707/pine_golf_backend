@@ -20,6 +20,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.pinewoods.score.tracker.Utilities.isUserAdmin;
+
 /**
  * Service class for managing Player entities.
  */
@@ -97,7 +99,11 @@ public class PlayerService {
         Player player = playerRepository.findByName(name)
             .orElseThrow(() -> new ResourceNotFoundException("Player with name " + name + " does not exist."));
 
-        return createPlayerDTO(player);
+        if (player.getRole() == Role.ADMIN && !isUserAdmin()) {
+            throw new ResourceNotFoundException("Player with name " + name + " does not exist.");
+        }
+
+        return player.toDTO();
     }
 
     /**
@@ -106,7 +112,9 @@ public class PlayerService {
      * @return List of PlayerDTO representing all players
      */
     public List<PlayerDTO> getAllPlayers() {
+        boolean isAdmin = isUserAdmin();
         return playerRepository.findAll().stream()
+                .filter(player -> isAdmin || player.getRole() != Role.ADMIN)
                 .map(PlayerService::createPlayerDTO)
                 .toList();
     }

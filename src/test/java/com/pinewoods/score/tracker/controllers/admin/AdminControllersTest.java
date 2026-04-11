@@ -229,7 +229,6 @@ class AdminControllersTest {
                         player1Username, player1Password,
                         path,
                         new PlayerDTO[]{
-                                admin,
                                 player1,
                                 player2
                         },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { Send, History, Plus, Calendar, Target, User, Search, X } from 'lucide-react';
+import { Send, History, Plus, Calendar, Target, User, Search, X, Trash2 } from 'lucide-react';
 import api from '../../api/client';
 
 interface FlightScoreDTO {
@@ -25,11 +25,12 @@ export const FlightsView = () => {
     const [players, setPlayers] = useState<string[]>([]);
     const [courses, setCourses] = useState<any[]>([]);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+    const [expandedFlights, setExpandedFlights] = useState<Record<string, boolean>>({});
 
-    // Form State for New Flight
+    // Form State for New Flight (support multiple players like AddFlightModal)
     const [courseName, setCourseName] = useState('');
-    const [targetPlayer, setTargetPlayer] = useState('');
-    const [holes, setHoles] = useState<number[]>(new Array(18).fill(0));
+    const [flightRows, setFlightRows] = useState<{ playerName: string; scores: number[] }[]>([]);
+    const [selectedPlayerToAdd, setSelectedPlayerToAdd] = useState('');
 
     // Fetch Logic
     const fetchFlights = async (playerName?: string) => {
@@ -108,58 +109,75 @@ export const FlightsView = () => {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
+        setExpandedFlights({});
         fetchFlights(searchPlayer);
     };
 
     const clearSearch = () => {
         setSearchPlayer('');
+        setExpandedFlights({});
         fetchFlights();
     };
 
     const handleSubmitFlight = async () => {
-        if (!courseName || !targetPlayer) return alert("Course and Player Name are required");
+        if (!courseName) return alert("Course is required");
         const courseExists = courses.some((c: any) => c?.name === courseName);
         if (!courseExists) return alert("Please select a valid course from the list.");
-        const playerExists = players.includes(targetPlayer);
-        if (!playerExists) return alert("Please select a valid player from the list.");
+        if (flightRows.length === 0) return alert("Please add at least one player to this flight.");
 
-        const totalScore = holes.reduce((a, b) => a + (Number(b) || 0), 0);
-        const payload: FlightScoreDTO[] = [{
-            playerName: targetPlayer,
-            courseName,
-            holeScores: holes,
-            score: totalScore,
-            birdies: 0
-        }];
+        const payload: FlightScoreDTO[] = flightRows.map(r => {
+            const totalScore = r.scores.reduce((a, b) => a + (Number(b) || 0), 0);
+            return {
+                playerName: r.playerName,
+                courseName,
+                holeScores: r.scores,
+                score: totalScore,
+                birdies: 0
+            } as FlightScoreDTO;
+        });
 
         try {
             await api.post('/flights', payload);
             alert("Flight saved!");
             setCourseName('');
-            setTargetPlayer('');
-            setHoles(new Array(18).fill(0));
+            setFlightRows([]);
+            setSelectedPlayerToAdd('');
             setView('history');
             fetchFlights();
         } catch (err) { alert("Error saving flight."); }
     };
 
-    // When switching to add view, prefill scores with base 3s like tournament and default player
+    // When switching to add view, default scores for any new players and optionally add current user
     useEffect(() => {
         if (view === 'add') {
-            setHoles(new Array(18).fill(3));
-            // Default player selection to signed-in user when available
-            if (currentUserName && players.includes(currentUserName)) {
-                setTargetPlayer(currentUserName);
+            // Auto-add signed-in user once if available and no players yet
+            if (flightRows.length === 0 && currentUserName && players.includes(currentUserName)) {
+                setFlightRows([{ playerName: currentUserName, scores: Array(18).fill(3) }]);
             }
         }
     }, [view]);
 
     // If players or current user info arrives later, ensure default target player in Add view
     useEffect(() => {
-        if (view === 'add' && !targetPlayer && currentUserName && players.includes(currentUserName)) {
-            setTargetPlayer(currentUserName);
+        if (view === 'add' && flightRows.length === 0 && currentUserName && players.includes(currentUserName)) {
+            setFlightRows([{ playerName: currentUserName, scores: Array(18).fill(3) }]);
         }
     }, [players, currentUserName]);
+
+    // Helpers for multi-player add view
+    const addPlayerToFlight = (name: string) => {
+        if (!name) return;
+        if (flightRows.some(r => r.playerName === name)) return;
+        setFlightRows(prev => [...prev, { playerName: name, scores: Array(18).fill(3) }]);
+        setSelectedPlayerToAdd('');
+    };
+    const removePlayerFromFlight = (index: number) => {
+        setFlightRows(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const toggleFlightExpand = (key: string) => {
+        setExpandedFlights(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     return (
         <div className="space-y-6">
@@ -199,6 +217,7 @@ export const FlightsView = () => {
                             const val = e.target.value;
                             setSearchPlayer(val);
                             if (players.includes(val)) {
+                                setExpandedFlights({});
                                 fetchFlights(val);
                             }
                         }}
@@ -237,24 +256,39 @@ export const FlightsView = () => {
                             const containsSelected = searchPlayer ? allEntries.some(fs => fs.playerName === searchPlayer) : true;
                             if (!containsSelected || allEntries.length === 0) return null;
 
-                            // Show the entire flight (all players), even when a player is selected
-                            const entries = allEntries;
-
                             const course = allEntries[0]?.courseName || '';
+                            const flightKey = String(f.id ?? `${f.date}|${course}`);
+                            const isExpanded = !!expandedFlights[flightKey];
+                            const entries = (searchPlayer && !isExpanded)
+                                ? allEntries.filter(fs => fs.playerName === searchPlayer)
+                                : allEntries;
 
                             return (
                                 <div key={i} className="bg-white rounded-2xl border border-latte-crust shadow-sm overflow-hidden hover:border-latte-mauve transition-colors">
                                     {/* Top header with Course on the left and Date on the right */}
-                                    <div className="bg-latte-mantle/50 px-6 py-3 flex justify-between items-center border-b border-latte-crust">
+                                    <div
+                                        className={`bg-latte-mantle/50 px-6 py-3 flex justify-between items-center border-b border-latte-crust ${searchPlayer ? 'cursor-pointer hover:bg-latte-mantle/70' : ''}`}
+                                        onClick={() => { if (searchPlayer) toggleFlightExpand(flightKey); }}
+                                        role={searchPlayer ? 'button' as any : undefined}
+                                        aria-expanded={searchPlayer ? isExpanded : undefined}
+                                        title={searchPlayer ? (isExpanded ? 'Hide other players' : 'Show all players in this flight') : undefined}
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="bg-white p-2 rounded-lg shadow-sm text-latte-mauve">
                                                 <Target size={16} />
                                             </div>
                                             <span className="font-black text-latte-text">{course}</span>
                                         </div>
-                                        <span className="text-[10px] font-black text-latte-subtext uppercase flex items-center gap-1">
-                                            <Calendar size={12} /> {new Date(f.date).toLocaleDateString()}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black text-latte-subtext uppercase flex items-center gap-1">
+                                                <Calendar size={12} /> {new Date(f.date).toLocaleDateString()}
+                                            </span>
+                                            {searchPlayer && (
+                                                <span className="text-[9px] font-black text-latte-subtext px-2 py-0.5 border border-latte-crust rounded-lg">
+                                                    {isExpanded ? 'Showing all players' : 'Show all players'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Entries list */}
@@ -295,31 +329,13 @@ export const FlightsView = () => {
                     )}
                 </div>
             ) : (
-                <div className="bg-white p-8 rounded-3xl border border-latte-crust shadow-sm max-w-3xl mx-auto">
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div>
-                            <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Player Name</label>
-                            <select
-                                value={targetPlayer}
-                                onChange={(e) => setTargetPlayer(e.target.value)}
-                                className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
-                            >
-                                <option value="" disabled>Select a player...</option>
-                                {players.map((p) => (
-                                    <option key={p} value={p}>{p}</option>
-                                ))}
-                            </select>
-                        </div>
+                <div className="bg-white p-8 rounded-3xl border border-latte-crust shadow-sm max-w-6xl mx-auto">
+                    <div className="grid grid-cols-2 gap-4 mb-6">
                         <div>
                             <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Course</label>
                             <select
                                 value={courseName}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    setCourseName(val);
-                                    // Auto-fill base scores like tournament (3s)
-                                    setHoles(new Array(18).fill(3));
-                                }}
+                                onChange={(e) => setCourseName(e.target.value)}
                                 className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
                             >
                                 <option value="" disabled>Select a course...</option>
@@ -328,35 +344,77 @@ export const FlightsView = () => {
                                 ))}
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Add Player</label>
+                            <select
+                                className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
+                                value={selectedPlayerToAdd}
+                                onChange={(e) => addPlayerToFlight(e.target.value)}
+                            >
+                                <option value="">+ Add Player to this Flight...</option>
+                                {players
+                                    .filter(p => !flightRows.find(r => r.playerName === p))
+                                    .map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="mb-8">
-                        <p className="text-xs font-black uppercase text-latte-subtext mb-4 ml-1">Scorecard (Holes 1-18)</p>
-                        <div className="grid grid-cols-6 md:grid-cols-9 gap-3">
-                            {holes.map((score, i) => (
-                                <div key={i}>
-                                    <label className="block text-[10px] font-black text-center text-latte-subtext mb-1">{i + 1}</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={score || ''}
-                                        onChange={(e) => {
-                                            const newHoles = [...holes];
-                                            newHoles[i] = parseInt(e.target.value) || 0;
-                                            setHoles(newHoles);
-                                        }}
-                                        className="w-full bg-latte-mantle text-center border-transparent rounded-xl py-3 font-black focus:bg-white focus:ring-2 ring-latte-mauve outline-none transition-all"
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                    <div className="overflow-x-auto w-full bg-latte-base/40 rounded-2xl border border-latte-crust shadow-inner p-4">
+                        <table className="w-full text-left border-collapse min-w-[900px]">
+                            <thead>
+                                <tr className="text-[10px] font-black text-latte-subtext uppercase tracking-widest border-b border-latte-crust">
+                                    <th className="p-2 w-10 text-center"></th>
+                                    <th className="p-2">Player</th>
+                                    {Array.from({ length: 18 }).map((_, i) => (
+                                        <th key={i} className="p-2 text-center w-8 text-[9px]">H{i + 1}</th>
+                                    ))}
+                                    <th className="p-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {flightRows.map((row, rowIndex) => (
+                                    <tr key={rowIndex} className="border-b border-latte-mantle hover:bg-white/30 transition-colors">
+                                        <td className="p-2 text-center">
+                                            <button onClick={() => removePlayerFromFlight(rowIndex)} className="text-latte-subtext hover:text-latte-red">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </td>
+                                        <td className="p-2 font-bold text-sm whitespace-nowrap">{row.playerName}</td>
+                                        {row.scores.map((score, holeIndex) => (
+                                            <td key={holeIndex} className="p-0.5">
+                                                <input
+                                                    type="number"
+                                                    className="w-full min-w-[32px] text-center p-1 rounded-md border border-transparent hover:border-latte-crust text-xs font-bold focus:border-latte-mauve focus:bg-white outline-none bg-transparent"
+                                                    value={score || ''}
+                                                    onChange={(e) => {
+                                                        const next = [...flightRows];
+                                                        next[rowIndex].scores[holeIndex] = parseInt(e.target.value) || 0;
+                                                        setFlightRows(next);
+                                                    }}
+                                                />
+                                            </td>
+                                        ))}
+                                        <td className="p-2 text-right font-black text-latte-mauve">
+                                            {row.scores.reduce((a, b) => a + (Number(b) || 0), 0)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        {flightRows.length === 0 && (
+                            <div className="text-center text-latte-subtext text-sm py-6">No players added yet. Use the Add Player dropdown above.</div>
+                        )}
                     </div>
 
                     <button
                         onClick={handleSubmitFlight}
-                        className="w-full bg-latte-mauve text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:shadow-lg hover:opacity-95 transition-all"
+                        disabled={!courseName || flightRows.length === 0}
+                        className="mt-6 w-full bg-latte-mauve text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:shadow-lg hover:opacity-95 transition-all disabled:opacity-50"
                     >
-                        <Send size={20} /> Save Scorecard
+                        <Send size={20} /> Submit Flight
                     </button>
                 </div>
             )}
