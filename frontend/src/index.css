@@ -65,3 +65,12 @@ code {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--color-latte-subtext);
 }
+
+/* Utility: hide scrollbar but allow scroll (use with overflow-x-auto/overflow-y-auto) */
+.no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}

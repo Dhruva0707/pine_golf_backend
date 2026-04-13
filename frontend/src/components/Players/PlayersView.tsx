@@ -107,7 +107,7 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header */}
-            <div className="flex justify-between items-end">
+            <div className="flex flex-wrap justify-between items-end gap-3">
                 <div>
                     <h2 className="text-3xl font-black text-latte-text">Roster</h2>
                     <p className="text-latte-subtext font-medium">
@@ -136,8 +136,8 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-3xl border border-latte-crust overflow-hidden shadow-sm">
-                <table className="w-full text-left border-collapse">
+            <div className="bg-white rounded-3xl border border-latte-crust shadow-sm overflow-x-auto no-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[640px]">
                     <thead className="bg-latte-mantle/50 border-b border-latte-crust">
                     <tr>
                         <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext">Golfer</th>
