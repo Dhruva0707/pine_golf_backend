@@ -189,8 +189,8 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                         </div>
 
                         {/* Standings Table with Tie Support */}
-                        <section className="bg-white rounded-3xl border border-latte-crust overflow-hidden shadow-sm">
-                            <table className="w-full text-left">
+                        <section className="bg-white rounded-3xl border border-latte-crust shadow-sm overflow-x-auto no-scrollbar">
+                            <table className="w-full text-left min-w-[520px]">
                                 <thead className="bg-latte-mantle text-latte-subtext text-xs uppercase font-black">
                                 <tr>
                                     <th className="px-6 py-3">Rank</th>

@@ -44,7 +44,7 @@ export const Dashboard = () => {
     return (
         <div className="min-h-screen flex flex-col bg-latte-base text-latte-text font-sans">
             {/* --- NAVIGATION HEADER --- */}
-            <header className="bg-white border-b border-latte-crust px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
+            <header className="bg-white border-b border-latte-crust px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                     {/* We removed bg-latte-green and padding from the img. p-1 adds a small, clean gap. */}
                     <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shadow-md">
@@ -61,7 +61,7 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Tab Switchers */}
-                <nav className="flex items-center bg-latte-mantle p-1 rounded-xl border border-latte-crust">
+                <nav className="flex items-center bg-latte-mantle p-1 rounded-xl border border-latte-crust overflow-x-auto no-scrollbar whitespace-nowrap max-w-full gap-1">
                     {[
                         { id: 'seasons', label: 'Seasons', icon: <Calendar size={16}/> },
                         { id: 'teams', label: 'Teams', icon: <LayoutDashboard size={16}/> },
