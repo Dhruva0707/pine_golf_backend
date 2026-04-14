@@ -27,6 +27,7 @@ import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.Response;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -96,6 +97,15 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.addScorecards(id, cards).toDTO());
     }
 
+    @PatchMapping("/{id}/{flightId}")
+    @Operation(summary = "link a flight to a tournament")
+    public ResponseEntity<FlightDTO> linkFlight(
+            @Parameter(description = "ID of the active tournament") @PathVariable Long id,
+            @Parameter(description = "ID of the active tournament") @PathVariable Long flightId
+    ) {
+        return ResponseEntity.ok(tournamentService.addExistingFlight(id, flightId).toDTO());
+    }
+
     @PostMapping("/{id}/end")
     @Operation(summary = "End and finalize the tournament",
             description = "Calculates awards (100/66/33), updates team standings, and clears the session from memory.")
@@ -119,6 +129,12 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
     }
 
+    @GetMapping("/active")
+    @Operation(summary = "Gets all tournaments that are currently active")
+    public ResponseEntity<List<TournamentDTO>> getActiveTournaments() {
+        return ResponseEntity.ok(tournamentService.getAllActiveTournaments());
+    }
+
     @GetMapping("/{seasonName}/{tournamentName}/leaderBoard")
     @Operation(summary = "Get the current tournament's leaderboard")
     public ResponseEntity<List<FlightScoreDTO>> getLeaderBoard(@PathVariable("tournamentName") String tournamentName,
@@ -133,6 +149,13 @@ public class TournamentController {
                                                  @PathVariable("seasonName") String seasonName) {
         Tournament t = tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName);
         Long id = t.getId();
+        tournamentService.deleteTournament(id);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a tournament by id")
+    public ResponseEntity<Void> deleteTournamentById(@PathVariable("id") Long id) {
         tournamentService.deleteTournament(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }

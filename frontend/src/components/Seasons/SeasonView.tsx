@@ -123,10 +123,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         }
     };
 
-    const handleDeleteTournament = async (seasonName: string, tournamentName: string) => {
+    const handleDeleteTournament = async (id: number, tournamentName: string) => {
         if (window.confirm(`Delete tournament "${tournamentName}"?`)) {
             try {
-                await api.delete(`/tournaments/${seasonName}/${tournamentName}`);
+                await api.delete(`/tournaments/${id}`);
                 fetchDataForSeason();
             } catch (err: any) { alert("Error deleting tournament."); }
         }
@@ -330,7 +330,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                                     <button onClick={() => handleExportTournament(t)} title="Export tournament" className="p-2 text-latte-subtext hover:text-latte-mauve rounded-lg">
                                                         <Download size={18} />
                                                     </button>
-                                                    <button onClick={() => handleDeleteTournament(selectedSeason!, t.name)} className="p-2 text-latte-subtext hover:text-latte-red rounded-lg" title="Delete tournament">
+                                                    <button onClick={() => handleDeleteTournament(t.id, t.name)} className="p-2 text-latte-subtext hover:text-latte-red rounded-lg" title="Delete tournament">
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { Send, History, Plus, Calendar, Target, User, Search, X, Trash2 } from 'lucide-react';
+import { Send, History, Plus, Calendar, Target, User, Search, X, Trash2, Link2 } from 'lucide-react';
 import api from '../../api/client';
 
 interface FlightScoreDTO {
@@ -17,7 +17,13 @@ interface FlightDTO {
     flights: FlightScoreDTO[];
 }
 
-export const FlightsView = () => {
+interface TournamentDTO {
+    id: number;
+    name: string;
+    seasonName?: string;
+}
+
+export const FlightsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const [view, setView] = useState<'history' | 'add'>('history');
     const [flights, setFlights] = useState<FlightDTO[]>([]);
     const [searchPlayer, setSearchPlayer] = useState('');
@@ -26,6 +32,13 @@ export const FlightsView = () => {
     const [courses, setCourses] = useState<any[]>([]);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
     const [expandedFlights, setExpandedFlights] = useState<Record<string, boolean>>({});
+
+        // Admin link-to-tournament state
+        const [linkingFlightId, setLinkingFlightId] = useState<number | null>(null);
+        const [activeTournaments, setActiveTournaments] = useState<TournamentDTO[]>([]);
+        const [tournamentsLoading, setTournamentsLoading] = useState(false);
+        const [tournamentsError, setTournamentsError] = useState<string | null>(null);
+        const [selectedTournamentId, setSelectedTournamentId] = useState<number | ''>('');
 
     // Form State for New Flight (support multiple players like AddFlightModal)
     const [courseName, setCourseName] = useState('');
@@ -179,6 +192,48 @@ export const FlightsView = () => {
         setExpandedFlights(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    // Admin: open link panel and fetch active tournaments
+    const openLinkPanel = async (flightId: number | undefined) => {
+        if (!flightId) return;
+        setLinkingFlightId(flightId);
+        setSelectedTournamentId('');
+        setTournamentsError(null);
+        setTournamentsLoading(true);
+        try {
+            const res = await api.get('/tournaments/active');
+            setActiveTournaments(Array.isArray(res.data) ? res.data : []);
+        } catch (e: any) {
+            console.error('Failed to load active tournaments', e);
+            setTournamentsError('Failed to load active tournaments');
+            setActiveTournaments([]);
+        } finally {
+            setTournamentsLoading(false);
+        }
+    };
+
+    const cancelLinkPanel = () => {
+        setLinkingFlightId(null);
+        setSelectedTournamentId('');
+        setTournamentsError(null);
+    };
+
+    const performLink = async () => {
+        if (!linkingFlightId || !selectedTournamentId) {
+            alert('Please choose a tournament');
+            return;
+        }
+        try {
+            await api.patch(`/tournaments/${selectedTournamentId}/${linkingFlightId}`);
+            alert('Flight linked to tournament');
+            cancelLinkPanel();
+            // Optionally refresh flights list to reflect any potential changes
+            fetchFlights(searchPlayer || undefined);
+        } catch (e) {
+            console.error('Failed to link flight', e);
+            alert('Failed to link flight to tournament');
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* --- TOP HEADER & ACTIONS --- */}
@@ -287,6 +342,16 @@ export const FlightsView = () => {
                                                 <span className="text-[9px] font-black text-latte-subtext px-2 py-0.5 border border-latte-crust rounded-lg">
                                                     {isExpanded ? 'Showing all players' : 'Show all players'}
                                                 </span>
+                                            )}
+                                            {isAdmin && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); openLinkPanel(f.id); }}
+                                                    className="ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-black bg-latte-blue text-white hover:opacity-90"
+                                                    title="Link this flight to an active tournament"
+                                                >
+                                                    <Link2 size={14} /> Link
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -416,6 +481,45 @@ export const FlightsView = () => {
                     >
                         <Send size={20} /> Submit Flight
                     </button>
+                </div>
+            )}
+            {isAdmin && linkingFlightId !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={cancelLinkPanel}>
+                    <div className="bg-white rounded-2xl shadow-xl border border-latte-crust w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-latte-crust">
+                            <h3 className="font-black text-latte-text text-lg">Link Flight #{linkingFlightId} to Tournament</h3>
+                            <button onClick={cancelLinkPanel} className="text-latte-subtext hover:text-latte-red"><X size={18} /></button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            {tournamentsLoading ? (
+                                <div className="text-sm text-latte-subtext">Loading active tournaments...</div>
+                            ) : tournamentsError ? (
+                                <div className="text-sm text-latte-red">{tournamentsError}</div>
+                            ) : activeTournaments.length === 0 ? (
+                                <div className="text-sm text-latte-subtext">No active tournaments found.</div>
+                            ) : (
+                                <div>
+                                    <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Active Tournaments</label>
+                                    <select
+                                        className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
+                                        value={selectedTournamentId}
+                                        onChange={(e) => setSelectedTournamentId(Number(e.target.value) as number)}
+                                    >
+                                        <option value="">Select a tournament...</option>
+                                        {activeTournaments.map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}{t.seasonName ? ` (${t.seasonName})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-5 pb-5 flex items-center justify-end gap-2">
+                            <button onClick={cancelLinkPanel} className="px-4 py-2 rounded-xl font-bold text-sm border border-latte-crust text-latte-text bg-white hover:bg-latte-base">Cancel</button>
+                            <button onClick={performLink} disabled={!selectedTournamentId} className="px-4 py-2 rounded-xl font-bold text-sm bg-latte-green text-white disabled:opacity-50">Link Flight</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -99,7 +99,7 @@ export const Dashboard = () => {
                 {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
                 {activeTab === 'courses' && <CourseManager isAdmin={isAdmin} />}
 
-                {activeTab === 'flights' && <FlightsView />}
+                {activeTab === 'flights' && <FlightsView isAdmin={isAdmin} />}
             </main>
         </div>
     );

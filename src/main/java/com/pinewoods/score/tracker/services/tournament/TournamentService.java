@@ -2,6 +2,7 @@ package com.pinewoods.score.tracker.services.tournament;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dao.flight.FlightRepository;
 import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dao.tournament.TournamentRepository;
@@ -38,6 +39,7 @@ public class TournamentService {
     private final TournamentRepository tournamentRepo;
     private final SeasonRepository seasonRepo;
     private final PlayerRepository playerRepo;
+    private final FlightRepository flightRepo;
     private final TeamStandingRepository standingRepo;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
     private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
@@ -87,30 +89,67 @@ public class TournamentService {
     @PreAuthorize( "hasRole('ADMIN')")
     public Flight addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
         Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
-        IScoringStrategy strategy = activeStrategies.get(tournamentId);
 
-        if (strategy == null || tournament.isFinished()) {
-            throw new ResourceConflictException("Tournament session expired or not initialized");
-        }
+        IScoringStrategy strategy = getValidStrategy(tournament);
 
-        // Use our Strategy to transform ScoreCards into a Flight entity
-        Flight calculatedFlight = strategy.calculateScores(cards);
         Flight flight = createFlight(cards, strategy);
+
+        return processAndLinkFlight(tournament, flight, cards, strategy);
+    }
+
+    /**
+     * Adds an existing flight to a tournament, and updates everything accordingly
+     *
+     * @param tournamentId tournament id
+     * @param flightId flight id
+     * @return FlightDTO representing the flight
+     */
+    @PreAuthorize( "hasRole('ADMIN')")
+    public Flight addExistingFlight(Long tournamentId, Long flightId) {
+        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
+        Flight flight = flightRepo.findById(flightId).orElseThrow();
+        IScoringStrategy strategy = getValidStrategy(tournament);
+
+        // Convert existing entity back to DTOs so the strategy can calculate scores
+        List<ScoreCardDTO> scoreCards = flight.getFlightScores().stream()
+                .map(fs -> new ScoreCardDTO(fs.getPlayer().toDTO(), fs.getHoleScores()))
+                .toList();
+
+        return processAndLinkFlight(tournament, flight, scoreCards, strategy);
+    }
+
+    private IScoringStrategy getValidStrategy(Tournament tournament) {
+        IScoringStrategy strategy = activeStrategies.get(tournament.getId());
+        if (strategy == null) {
+            throw new ResourceNotFoundException("Scoring strategy not found for tournament " + tournament.getId());
+        }
+        return strategy;
+    }
+
+    private Flight processAndLinkFlight(Tournament tournament, Flight flight,
+                                        List<ScoreCardDTO> cards, IScoringStrategy strategy) {
+
+        // 1. Calculate scores (for the cache/return object)
+        Flight calculatedFlight = strategy.calculateScores(cards);
+
+        // 2. Link the Flight to the Tournament
+        // JPA will handle the tournament_flights table update automatically
         tournament.getFlights().add(flight);
 
-        // update birdies in standing for each team
+        // 3. Update Birdies in Standings
         for (FlightScore fs : calculatedFlight.getFlightScores()) {
             Team team = fs.getPlayer().getTeam();
             standingRepo.findBySeasonNameAndTeamName(tournament.getSeason().getName(), team.getName())
                     .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
         }
 
-        tournamentRepo.saveAndFlush(tournament); // Cascades to Flight and FlightScores
+        // 4. Update Cache
+        calculatedFlightCache.computeIfAbsent(tournament.getId(), k -> new ArrayList<>())
+                .add(calculatedFlight);
 
-        calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
-        calculatedFlightCache.get(tournamentId).add(calculatedFlight);
+        // 5. Persist everything
+        tournamentRepo.saveAndFlush(tournament);
 
-        // Convert to DTO for the frontend
         return calculatedFlight;
     }
 
@@ -174,14 +213,22 @@ public class TournamentService {
                         " not found in season " + seasonName));
     }
 
+    public List<TournamentDTO> getAllActiveTournaments() {
+        // Active means: not finished AND currently has a scoring strategy parked in memory
+        return tournamentRepo.findAll().stream()
+                .filter(t -> !t.isFinished() && activeStrategies.containsKey(t.getId()))
+                .map(Tournament::toDTO)
+                .toList();
+    }
+
     // ================ Delete Tournament ======================
     @PreAuthorize( "hasRole('ADMIN')")
     public void deleteTournament(Long tournamentId) {
         Tournament tournament = tournamentRepo.findById(tournamentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
         Season season = tournament.getSeason();
-        season.getTournaments().remove(tournament);
-        tournamentRepo.delete(tournament);
+        season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+        tournamentRepo.deleteById(tournamentId);
         activeStrategies.remove(tournamentId);
     }
 
@@ -386,6 +433,6 @@ public class TournamentService {
         tournament.setAwards(newAwardsMap);
 
         // Save cascades to all flights and scores
-        tournamentRepo.save(tournament);
+        tournamentRepo.saveAndFlush(tournament);
     }
 }
