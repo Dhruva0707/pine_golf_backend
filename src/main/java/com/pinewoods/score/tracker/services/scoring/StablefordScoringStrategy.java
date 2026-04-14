@@ -3,10 +3,8 @@ package com.pinewoods.score.tracker.services.scoring;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
-import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
-import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

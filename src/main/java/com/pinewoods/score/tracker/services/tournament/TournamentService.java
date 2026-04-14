@@ -1,10 +1,12 @@
 package com.pinewoods.score.tracker.services.tournament;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dao.tournament.TournamentRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
@@ -18,10 +20,13 @@ import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -36,6 +41,7 @@ public class TournamentService {
     private final TeamStandingRepository standingRepo;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
     private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper;
 
     // ==================== Create Tournament ====================
      /**
@@ -288,5 +294,98 @@ public class TournamentService {
         });
 
         return leaderBoard;
+    }
+
+    // ============== Import and export ===============
+
+    public record TournamentExport(
+            @Schema(description = "Tournament name", example = "02_02_2026_PineWoodsMMR")
+            String name,
+            @Schema(description = "Awards for each player")
+            Map<String, Integer> awards,
+            String seasonName,
+            String strategyName,
+            List<FlightDTO> flights){}
+
+    @PreAuthorize("hasRole('ADMIN')")
+    public byte[] exportTournament(Long tournamentId) throws IOException {
+        Tournament tournament = tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
+
+        if (!tournament.isFinished()) {
+            throw new ResourceConflictException("Only finished tournaments can be exported.");
+        }
+
+        // Convert to DTO
+        Map<String, Integer> portableAwards = new HashMap<>();
+        tournament.getAwards().forEach((playerId, rank) -> {
+            playerRepo.findById(playerId).ifPresent(p -> portableAwards.put(p.getName(), rank));
+        });
+
+        TournamentDTO tournamentDto = tournament.toDTO();
+
+        TournamentExport dto = new TournamentExport(tournamentDto.name(),
+                portableAwards,
+                tournament.getSeason().getName(),
+                tournamentDto.strategyName(),
+                tournamentDto.flights());
+
+        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(dto);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    public void importTournament(byte[] jsonData, String targetSeasonName) throws IOException {
+        // 1. Use the new Export record to read the data
+        TournamentExport exportDto = objectMapper.readValue(jsonData, TournamentExport.class);
+
+        Season season = seasonRepo.findByName(targetSeasonName)
+                .orElseThrow(() -> new ResourceNotFoundException("Season not found"));
+
+        Tournament tournament = Tournament.builder()
+                .name(exportDto.name())
+                .season(season)
+                .strategyName(exportDto.strategyName())
+                .flights(new ArrayList<>())
+                .isFinished(true)
+                .build();
+
+        // This will hold our final Awards: NewPlayerID (Long) -> Rank (Integer)
+        Map<Long, Integer> newAwardsMap = new HashMap<>();
+
+        // 2. Create the flights
+        for (FlightDTO flightDto : exportDto.flights()) {
+            Flight flight = Flight.builder()
+                    .date(flightDto.date())
+                    .build();
+
+            for (FlightScoreDTO scoreDto : flightDto.flights()) {
+                // Find player in the CURRENT database by name
+                Player player = playerRepo.findByName(scoreDto.playerName())
+                        .orElseThrow(() -> new ResourceNotFoundException("Player not found: " + scoreDto.playerName()));
+
+                FlightScore score = FlightScore.builder()
+                        .player(player)
+                        .score(scoreDto.score())
+                        .holeScores(scoreDto.holeScores())
+                        .courseName(scoreDto.courseName())
+                        .birdies(scoreDto.birdies())
+                        .flight(flight)
+                        .build();
+                flight.getFlightScores().add(score);
+
+                // 3. Map the Award if it exists for this player name
+                if (exportDto.awards() != null && exportDto.awards().containsKey(player.getName())) {
+                    Integer rank = exportDto.awards().get(player.getName());
+                    newAwardsMap.put(player.getId(), rank);
+                }
+            }
+            tournament.getFlights().add(flight);
+        }
+
+        // Set the translated awards map
+        tournament.setAwards(newAwardsMap);
+
+        // Save cascades to all flights and scores
+        tournamentRepo.save(tournament);
     }
 }
