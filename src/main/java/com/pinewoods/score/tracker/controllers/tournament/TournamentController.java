@@ -27,10 +27,14 @@ import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -154,5 +158,38 @@ public class TournamentController {
         private Map<Integer, Integer> pointsMap;
         @JsonProperty("handicapMultiplier")
         private double handicapMultiplier;
+    }
+
+    // ============= Import and export ================
+    @GetMapping("/{id}/export")
+    public ResponseEntity<byte[]> exportTournament(@PathVariable Long id) {
+        try {
+            byte[] jsonData = tournamentService.exportTournament(id);
+            String filename = "tournament_export_" + id + ".json";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(jsonData);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Uploads a previously exported JSON file to import it into a season.
+     */
+    @PostMapping("/import")
+    public ResponseEntity<String> importTournament(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("seasonName") String seasonName) {
+        try {
+            tournamentService.importTournament(file.getBytes(), seasonName);
+            return ResponseEntity.ok("Tournament imported successfully into " + seasonName);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Failed to process the import file.");
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 }

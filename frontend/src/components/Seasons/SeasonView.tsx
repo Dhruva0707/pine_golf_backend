@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Calendar, Trophy, ChevronRight, Trash2, Settings2, CheckCircle2, Award } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { ChangeEvent } from 'react';
+import { Plus, Calendar, Trophy, ChevronRight, Trash2, Settings2, CheckCircle2, Award, Download, Upload } from 'lucide-react';
 import api from '../../api/client';
 import { AddTournamentModal } from './AddTournamentModal';
 import { FlightManagerModal } from '../Flights/AddFlightModal';
@@ -22,6 +23,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const [isTourneyModalOpen, setIsTourneyModalOpen] = useState(false);
     const [activeTourneyForFlights, setActiveTourneyForFlights] = useState<any | null>(null);
     const [expandedFlights, setExpandedFlights] = useState<Record<number, boolean>>({});
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const sortedSeasons = useMemo(() => {
         return [...seasons].sort((a, b) => b.localeCompare(a));
@@ -130,6 +132,48 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         }
     };
 
+    const handleExportTournament = async (tournament: any) => {
+        try {
+            const res = await api.get(`/tournaments/${tournament.id}/export`, { responseType: 'blob' });
+            const blob = new Blob([res.data], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const safeName = `${tournament.name}.json`.replace(/[^a-zA-Z0-9._-]+/g, '_');
+            link.setAttribute('download', safeName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data?.message || 'Failed to export tournament');
+        }
+    };
+
+    const handleImportClick = () => {
+        if (!isAdmin) return;
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        // Reset the input so the same file can be selected again later
+        e.target.value = '';
+        if (!file || !selectedSeason) return;
+        const form = new FormData();
+        form.append('file', file);
+        form.append('seasonName', selectedSeason);
+        try {
+            await api.post('/tournaments/import', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+            alert('Tournament imported successfully');
+            await fetchDataForSeason();
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data || 'Failed to import tournament');
+        }
+    };
+
     // --- Logic for Ties ---
     let currentRank = 0;
     let lastPoints = -1;
@@ -181,9 +225,14 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                     </button>
                                 )}
                                 {isAdmin && (
-                                    <button onClick={() => setIsTourneyModalOpen(true)} className="bg-latte-mauve text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
-                                        <Trophy size={18} /> New Tournament
-                                    </button>
+                                    <>
+                                        <button onClick={handleImportClick} className="bg-latte-base text-latte-text px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-latte-crust">
+                                            <Upload size={18} /> Import Tournament
+                                        </button>
+                                        <button onClick={() => setIsTourneyModalOpen(true)} className="bg-latte-mauve text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
+                                            <Trophy size={18} /> New Tournament
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -276,7 +325,16 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                             <button onClick={() => setActiveTourneyForFlights({...t, seasonName: selectedSeason})} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
                                                 <Settings2 size={16} /> Manage
                                             </button>
-                                            {isAdmin && <button onClick={() => handleDeleteTournament(selectedSeason!, t.name)} className="p-2 text-latte-subtext hover:text-latte-red rounded-lg"><Trash2 size={18} /></button>}
+                                            {isAdmin && (
+                                                <>
+                                                    <button onClick={() => handleExportTournament(t)} title="Export tournament" className="p-2 text-latte-subtext hover:text-latte-mauve rounded-lg">
+                                                        <Download size={18} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteTournament(selectedSeason!, t.name)} className="p-2 text-latte-subtext hover:text-latte-red rounded-lg" title="Delete tournament">
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
@@ -320,6 +378,15 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                 )}
             </div>
 
+            {isAdmin && (
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleFileChange}
+                    className="hidden"
+                />
+            )}
             <AddTournamentModal isOpen={isTourneyModalOpen} onClose={() => setIsTourneyModalOpen(false)} seasonName={selectedSeason || ''} onSuccess={fetchDataForSeason} />
             <FlightManagerModal isOpen={!!activeTourneyForFlights} onClose={() => { setActiveTourneyForFlights(null); fetchDataForSeason(); }} tournament={activeTourneyForFlights} />
         </div>
