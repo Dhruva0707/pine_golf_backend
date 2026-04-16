@@ -2,6 +2,7 @@ package com.pinewoods.score.tracker.services.tournament;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dao.tournament.TournamentRepository;
@@ -19,9 +20,11 @@ import com.pinewoods.score.tracker.entities.season.TeamStanding;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
+import com.pinewoods.score.tracker.services.flight.FlightService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -39,9 +42,11 @@ public class TournamentService {
     private final SeasonRepository seasonRepo;
     private final PlayerRepository playerRepo;
     private final TeamStandingRepository standingRepo;
+    private final CourseRepository courseRepo;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
     private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+    private final FlightService flightService;
 
     // ==================== Create Tournament ====================
      /**
@@ -75,6 +80,37 @@ public class TournamentService {
         // Put the specific strategy instance (with its pars/indexes) into memory
         activeStrategies.put(saved.getId(), strategy);
         return saved;
+    }
+
+    public List<Integer> getDefaultScores(Long tournamentId, Long playerId) {
+        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
+        IScoringStrategy strategy = activeStrategies.get(tournamentId);
+
+        if (strategy == null || tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament session expired or not initialized");
+        }
+
+        // calculate effective handicap
+        double effectiveHandicap = playerRepo.findById(playerId).orElseThrow().getHandicap() * strategy.getHandicapMultiplier();
+
+        Long courseId = courseRepo.findByName(strategy.getCourseName()).orElseThrow().getId();
+
+        return flightService.getDefaultScores(courseId, effectiveHandicap);
+    }
+
+    public List<Integer> getDefaultScoresByHandicap(Long tournamentId, double handicap) {
+        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
+        IScoringStrategy strategy = activeStrategies.get(tournamentId);
+
+        if (strategy == null || tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament session expired or not initialized");
+        }
+
+        double effectiveHandicap = handicap * strategy.getHandicapMultiplier();
+
+        Long courseId = courseRepo.findByName(strategy.getCourseName()).orElseThrow().getId();
+
+        return flightService.getDefaultScores(courseId, effectiveHandicap);
     }
 
     /**
@@ -180,7 +216,7 @@ public class TournamentService {
         // Remove association from the Season so the bidirectional collection stays consistent
         Season season = tournament.getSeason();
         if (season != null) {
-            season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+            season.getTournaments().remove(tournament);
             seasonRepo.save(season);
         }
 

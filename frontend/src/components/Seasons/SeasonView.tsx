@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import { Plus, Calendar, Trophy, ChevronRight, Trash2, Settings2, CheckCircle2, Award, Download, Upload } from 'lucide-react';
+import {
+    Plus,
+    Calendar,
+    Trophy,
+    ChevronRight,
+    Trash2,
+    CheckCircle2,
+    Award,
+    Download,
+    Upload
+} from 'lucide-react';
 import api from '../../api/client';
 import { AddTournamentModal } from './AddTournamentModal';
 import { FlightManagerModal } from '../Flights/AddFlightModal';
@@ -46,6 +56,8 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         return [...tournaments].reverse();
     }, [tournaments]);
 
+    const canManageTournament = (tournament: any) => !tournament?.awards || Object.keys(tournament.awards).length === 0;
+
     useEffect(() => {
         fetchSeasons();
         fetchPlayers(); // Fetch players once on mount
@@ -63,7 +75,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
 
     const fetchPlayers = async () => {
         try {
-            const res = await api.get('/players');
+            await api.get('/players');
         } catch (err) { console.error("Failed to fetch players", err); }
     };
 
@@ -232,9 +244,18 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         }
     };
 
+    const handleEndTournament = async (tournament: any) => {
+        if (window.confirm(`Finalize ${tournament.name}?`)) {
+            try {
+                await api.post(`/tournaments/${tournament.id}/end`);
+                await fetchDataForSeason();
+            } catch (err) {
+                alert('Failed to end tournament.');
+            }
+        }
+    };
+
     // --- Logic for Ties ---
-    let currentRank = 0;
-    let lastPoints = -1;
 
     return (
         <div className="grid grid-cols-12 gap-8">
@@ -308,13 +329,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                 </thead>
                                 <tbody className="divide-y divide-latte-crust">
                                 {(() => {
-                                    // Reset trackers for the render pass
                                     let currentRank = 0;
                                     let lastPoints = -1;
 
                                     return sortedStandings.map((team, idx) => {
-                                        // If points are different from previous, update rank to the current position (1-indexed)
-                                        // If points are the same, they keep the same rank (Tied)
                                         if (team.points !== lastPoints) {
                                             currentRank = idx + 1;
                                             lastPoints = team.points;
@@ -323,7 +341,6 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                         return (
                                             <tr key={team.teamName} className="hover:bg-latte-base/10 transition-colors">
                                                 <td className="px-6 py-4 font-black text-latte-subtext">
-                                                    {/* Added a '#' prefix for visual clarity */}
                                                     #{currentRank}
                                                 </td>
                                                 <td className="px-6 py-4 font-bold text-latte-text">
@@ -380,12 +397,21 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                             <button onClick={() => setExpandedFlights(prev => ({ ...prev, [t.id]: !prev[t.id] }))} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
                                                 <ChevronRight size={16} className={`${expandedFlights[t.id] ? 'rotate-90' : ''} transition-transform`} /> View Flights
                                             </button>
-                                            <button onClick={() => handleOpenLeaderboard(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
-                                                <Settings2 size={16} /> Leaderboard
-                                            </button>
-                                            <button onClick={() => handleOpenTournamentManager(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
-                                                <Settings2 size={16} /> Manage
-                                            </button>
+                                            {canManageTournament(t) && (
+                                                <>
+                                                    <button onClick={() => handleOpenLeaderboard(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                                        <Trophy size={16} /> Leaderboard
+                                                    </button>
+                                                    <button onClick={() => handleOpenTournamentManager(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                                        <Plus size={16} /> Add Flight
+                                                    </button>
+                                                    {isAdmin && (
+                                                        <button onClick={() => handleEndTournament(t)} className="px-4 py-2 text-sm font-bold bg-latte-green text-white rounded-xl hover:brightness-110 flex items-center gap-2">
+                                                            <CheckCircle2 size={16} /> End Tournament
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
                                             {isAdmin && (
                                                 <>
                                                     <button onClick={() => handleExportTournament(t)} title="Export tournament" className="p-2 text-latte-subtext hover:text-latte-mauve rounded-lg">

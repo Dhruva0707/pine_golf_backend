@@ -13,12 +13,14 @@ import java.util.*;
 public class StablefordScoringStrategy extends BaseScoringStrategy {
 
     final Map<Integer, Integer> pointsMap;
-    final double handicapMultiplier;
     PlayerRepository playerRepo;
 
     public StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
                                      Map<Integer, Integer> pointsMap, double handicapMultiplier, String courseName,
                                      PlayerRepository playerRepo) {
+
+        super(handicapMultiplier);
+
         if (pars.size() != 18 || indexes.size() != 18) {
             throw new IllegalArgumentException("Pars and indexes must be of length 18");
         }
@@ -26,7 +28,6 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
         this.pars = pars;
         this.indexes = indexes;
         this.pointsMap = pointsMap;
-        this.handicapMultiplier = handicapMultiplier;
         this.playerRepo = playerRepo;
         this.courseName = courseName;
     }

@@ -39,7 +39,6 @@ public class Tournament {
             joinColumns = @JoinColumn(name = "tournament_id"),
             inverseJoinColumns = @JoinColumn(name = "flight_id")
     )
-
     private List<Flight> flights = new ArrayList<>();
 
     private String strategyName; // e.g., "STABLEFORD"

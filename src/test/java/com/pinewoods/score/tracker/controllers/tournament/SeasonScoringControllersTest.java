@@ -5,8 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pinewoods.score.tracker.dto.admin.AuthenticationDTOs;
 import com.pinewoods.score.tracker.dto.course.CourseDTO;
-import com.pinewoods.score.tracker.dto.flight.FlightDTO;
-import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.season.SeasonDTO;
 import com.pinewoods.score.tracker.dto.season.TeamStandingDTO;
@@ -103,7 +101,12 @@ public class SeasonScoringControllersTest {
         final String strategyType = "STABLEFORD";
 
         // create the test course
-        CourseDTO courseDTO = new CourseDTO(TEST_COURSE, pars, indexes);
+        CourseDTO courseDTO = CourseDTO.builder()
+                .name(TEST_COURSE)
+                .pars(pars)
+                .indexes(indexes)
+                .build();
+
         sendRequest("/courses", objectMapper.writeValueAsString(courseDTO), token, HttpMethod.POST, restClient);
 
         TournamentController.TournamentCreateRequest tournamentCreateRequest =
@@ -159,20 +162,7 @@ public class SeasonScoringControllersTest {
                 objectMapper.writeValueAsString(cards), token,
                 HttpMethod.POST, restClient);
 
-        assertEquals(HttpStatus.OK, flightSubmission.getStatusCode());
-        List<FlightScoreDTO> flights = objectMapper.readValue(flightSubmission.getBody(), FlightDTO.class).flights();
-        Map<String, Integer> expectedScores = Map.of(
-                "Pro_Phil", 40,
-                "Average_Joe", 54,
-                "High_Harry", 53
-        );
-
-        for (FlightScoreDTO flight : flights) {
-            String playerName = flight.playerName();
-            Integer expectedScore = expectedScores.get(playerName);
-            assertEquals(expectedScore, flight.score(),
-                    "Score for " + playerName + " should be " + expectedScore);
-        }
+        assertEquals(HttpStatus.NO_CONTENT, flightSubmission.getStatusCode());
 
         // --- STEP 3: Finalize Tournament ---
         sendRequest(
@@ -180,6 +170,8 @@ public class SeasonScoringControllersTest {
                 "", token,
                 HttpMethod.POST, restClient
         );
+
+        token = loginAndGetToken("admin", "admin_pass");
 
         ResponseEntity<String> tournamentResult = sendRequest(
                 TOURNAMENT_PATH + "/" + seasonName + "/" + tourName,

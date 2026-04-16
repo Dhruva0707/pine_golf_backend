@@ -17,4 +17,6 @@ public interface IScoringStrategy {
             List<Integer> scores);
 
     String getCourseName();
+
+    double getHandicapMultiplier();
 }

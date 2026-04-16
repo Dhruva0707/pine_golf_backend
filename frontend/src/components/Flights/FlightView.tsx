@@ -17,19 +17,25 @@ interface FlightDTO {
     flights: FlightScoreDTO[];
 }
 
+interface PlayerDTO {
+    name: string;
+    team?: string;
+    handicap: number;
+}
+
 export const FlightsView = () => {
     const [view, setView] = useState<'history' | 'add'>('history');
     const [flights, setFlights] = useState<FlightDTO[]>([]);
     const [searchPlayer, setSearchPlayer] = useState('');
     const [loading, setLoading] = useState(false);
-    const [players, setPlayers] = useState<string[]>([]);
+    const [players, setPlayers] = useState<PlayerDTO[]>([]);
     const [courses, setCourses] = useState<any[]>([]);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
     const [expandedFlights, setExpandedFlights] = useState<Record<string, boolean>>({});
 
     // Form State for New Flight (support multiple players like AddFlightModal)
     const [courseName, setCourseName] = useState('');
-    const [flightRows, setFlightRows] = useState<{ playerName: string; scores: number[] }[]>([]);
+    const [flightRows, setFlightRows] = useState<{ player: PlayerDTO; scores: number[] }[]>([]);
     const [selectedPlayerToAdd, setSelectedPlayerToAdd] = useState('');
 
     // Fetch Logic
@@ -56,12 +62,22 @@ export const FlightsView = () => {
         }
     };
 
+    const normalizePlayer = (p: any): PlayerDTO | null => {
+        const name = p?.name ?? p?.username ?? p?.displayName;
+        if (!name) return null;
+        return {
+            name,
+            team: p?.team,
+            handicap: Number(p.handicap)
+        };
+    };
+
     const fetchPlayers = async () => {
         try {
             const res = await api.get('/players');
-            const names: string[] = (res.data || []).map((p: any) => p.name ?? p.username ?? p.displayName).filter(Boolean);
-            const uniqueNames = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
-            setPlayers(uniqueNames);
+            const normalized = (res.data || []).map(normalizePlayer).filter(Boolean) as PlayerDTO[];
+            const uniqueByName = Array.from(new Map(normalized.map(p => [p.name, p])).values()).sort((a, b) => a.name.localeCompare(b.name));
+            setPlayers(uniqueByName);
         } catch (err) {
             console.error('Failed to fetch players', err);
             setPlayers([]);
@@ -76,6 +92,29 @@ export const FlightsView = () => {
             console.error('Failed to fetch courses', err);
             setCourses([]);
         }
+    };
+
+    const getDefaultScoresForCourse = (name: string) => {
+        const course = courses.find((c: any) => c?.name === name);
+        const pars = course?.pars ?? [];
+        return Array.from({ length: 18 }, (_, i) => Number(pars[i]) || 3);
+    };
+
+    const getExpectedScoresForPlayer = async (player: PlayerDTO | undefined, courseName: string) => {
+        const course = courses.find((c: any) => c?.name === courseName);
+        const courseId = course?.id ?? course?.courseId;
+        const handicap = Number(player?.handicap);
+
+        if (courseId !== undefined && !Number.isNaN(handicap)) {
+            try {
+                const res = await api.get(`/flights/${courseId}/${handicap}`);
+                if (Array.isArray(res.data) && res.data.length > 0) return res.data.map((v: any) => Number(v) || 0);
+            } catch (err) {
+                console.error('Failed to fetch expected scores for player', err);
+            }
+        }
+
+        return getDefaultScoresForCourse(courseName);
     };
 
     useEffect(() => {
@@ -128,7 +167,7 @@ export const FlightsView = () => {
         const payload: FlightScoreDTO[] = flightRows.map(r => {
             const totalScore = r.scores.reduce((a, b) => a + (Number(b) || 0), 0);
             return {
-                playerName: r.playerName,
+                playerName: r.player.name,
                 courseName,
                 holeScores: r.scores,
                 score: totalScore,
@@ -150,25 +189,37 @@ export const FlightsView = () => {
     // When switching to add view, default scores for any new players and optionally add current user
     useEffect(() => {
         if (view === 'add') {
-            // Auto-add signed-in user once if available and no players yet
-            if (flightRows.length === 0 && currentUserName && players.includes(currentUserName)) {
-                setFlightRows([{ playerName: currentUserName, scores: Array(18).fill(3) }]);
+            if (flightRows.length === 0 && currentUserName) {
+                const current = players.find(p => p.name === currentUserName);
+                if (current) {
+                    void (async () => {
+                        setFlightRows([{ player: current, scores: await getExpectedScoresForPlayer(current, courseName) }]);
+                    })();
+                }
             }
         }
-    }, [view]);
+    }, [view, courseName, flightRows.length, currentUserName, players]);
 
     // If players or current user info arrives later, ensure default target player in Add view
     useEffect(() => {
-        if (view === 'add' && flightRows.length === 0 && currentUserName && players.includes(currentUserName)) {
-            setFlightRows([{ playerName: currentUserName, scores: Array(18).fill(3) }]);
+        if (view === 'add' && flightRows.length === 0 && currentUserName) {
+            const current = players.find(p => p.name === currentUserName);
+            if (current) {
+                void (async () => {
+                    setFlightRows([{ player: current, scores: await getExpectedScoresForPlayer(current, courseName) }]);
+                })();
+            }
         }
     }, [players, currentUserName]);
 
     // Helpers for multi-player add view
-    const addPlayerToFlight = (name: string) => {
+    const addPlayerToFlight = async (name: string) => {
         if (!name) return;
-        if (flightRows.some(r => r.playerName === name)) return;
-        setFlightRows(prev => [...prev, { playerName: name, scores: Array(18).fill(3) }]);
+        if (flightRows.some(r => r.player.name === name)) return;
+        const player = players.find(p => p.name === name);
+        if (!player) return;
+        const scores = await getExpectedScoresForPlayer(player, courseName);
+        setFlightRows(prev => [...prev, { player, scores }]);
         setSelectedPlayerToAdd('');
     };
     const removePlayerFromFlight = (index: number) => {
@@ -216,7 +267,7 @@ export const FlightsView = () => {
                         onChange={(e) => {
                             const val = e.target.value;
                             setSearchPlayer(val);
-                            if (players.includes(val)) {
+                            if (players.some(p => p.name === val)) {
                                 setExpandedFlights({});
                                 fetchFlights(val);
                             }
@@ -225,7 +276,7 @@ export const FlightsView = () => {
                     />
                     <datalist id="player-list">
                         {players.map((p) => (
-                            <option key={p} value={p} />
+                            <option key={p.name} value={p.name} />
                         ))}
                     </datalist>
                     {searchPlayer && (
@@ -251,21 +302,19 @@ export const FlightsView = () => {
                         </div>
                     ) : (
                         flights.map((f, i) => {
-                            // Only show flights that have at least one available player entry (and respect search filter)
                             const allEntries = (f.flights || []).filter(fs => fs && fs.playerName);
                             const containsSelected = searchPlayer ? allEntries.some(fs => fs.playerName === searchPlayer) : true;
                             if (!containsSelected || allEntries.length === 0) return null;
 
                             const course = allEntries[0]?.courseName || '';
                             const flightKey = String(f.id ?? `${f.date}|${course}`);
-                            const isExpanded = !!expandedFlights[flightKey];
+                            const isExpanded = expandedFlights[flightKey];
                             const entries = (searchPlayer && !isExpanded)
                                 ? allEntries.filter(fs => fs.playerName === searchPlayer)
                                 : allEntries;
 
                             return (
                                 <div key={i} className="bg-white rounded-2xl border border-latte-crust shadow-sm overflow-hidden hover:border-latte-mauve transition-colors">
-                                    {/* Top header with Course on the left and Date on the right */}
                                     <div
                                         className={`bg-latte-mantle/50 px-6 py-3 flex justify-between items-center border-b border-latte-crust ${searchPlayer ? 'cursor-pointer hover:bg-latte-mantle/70' : ''}`}
                                         onClick={() => { if (searchPlayer) toggleFlightExpand(flightKey); }}
@@ -291,7 +340,6 @@ export const FlightsView = () => {
                                         </div>
                                     </div>
 
-                                    {/* Entries list */}
                                     <div className="p-6 space-y-6">
                                         {entries.map((fs, idx) => (
                                             <div key={idx} className="border border-latte-crust/60 rounded-xl p-4">
@@ -301,9 +349,7 @@ export const FlightsView = () => {
                                                         <span className="font-black text-latte-text">{fs.playerName}</span>
                                                     </div>
                                                     <div className="flex items-center gap-4">
-                                                        {typeof fs.birdies === 'number' && (
-                                                            <div className="bg-latte-green/10 text-latte-green px-3 py-1 rounded-lg text-xs font-black">{fs.birdies} Birdies</div>
-                                                        )}
+                                                        <div className="bg-latte-green/10 text-latte-green px-3 py-1 rounded-lg text-xs font-black">{fs.birdies} Birdies</div>
                                                         <div className="bg-latte-mauve/10 px-4 py-2 rounded-xl text-right">
                                                             <span className="text-2xl font-black text-latte-mauve block leading-none">{fs.score}</span>
                                                             <span className="text-[8px] font-black uppercase text-latte-mauve/60">Total Score</span>
@@ -311,7 +357,6 @@ export const FlightsView = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Hole scores grid */}
                                                 <div className="grid grid-cols-9 md:grid-cols-18 gap-1">
                                                     {(fs.holeScores || []).map((s, hIdx) => (
                                                         <div key={hIdx} className="text-center">
@@ -335,7 +380,17 @@ export const FlightsView = () => {
                             <label className="block text-xs font-black uppercase text-latte-subtext mb-2 ml-1">Course</label>
                             <select
                                 value={courseName}
-                                onChange={(e) => setCourseName(e.target.value)}
+                                onChange={async (e) => {
+                                    const nextCourse = e.target.value;
+                                    setCourseName(nextCourse);
+                                    const updated = await Promise.all(
+                                        flightRows.map(async row => ({
+                                            ...row,
+                                            scores: await getExpectedScoresForPlayer(row.player, nextCourse)
+                                        }))
+                                    );
+                                    setFlightRows(updated);
+                                }}
                                 className="w-full bg-latte-mantle border-transparent rounded-xl px-4 py-3 font-bold focus:ring-2 ring-latte-mauve outline-none transition-all"
                             >
                                 <option value="" disabled>Select a course...</option>
@@ -353,9 +408,9 @@ export const FlightsView = () => {
                             >
                                 <option value="">+ Add Player to this Flight...</option>
                                 {players
-                                    .filter(p => !flightRows.find(r => r.playerName === p))
+                                    .filter(p => !flightRows.find(r => r.player.name === p.name))
                                     .map(p => (
-                                        <option key={p} value={p}>{p}</option>
+                                        <option key={p.name} value={p.name}>{p.name}</option>
                                     ))}
                             </select>
                         </div>
@@ -381,7 +436,7 @@ export const FlightsView = () => {
                                                 <Trash2 size={14} />
                                             </button>
                                         </td>
-                                        <td className="p-2 font-bold text-sm whitespace-nowrap">{row.playerName}</td>
+                                        <td className="p-2 font-bold text-sm whitespace-nowrap">{row.player.name}</td>
                                         {row.scores.map((score, holeIndex) => (
                                             <td key={holeIndex} className="p-0.5">
                                                 <input
@@ -421,3 +476,4 @@ export const FlightsView = () => {
         </div>
     );
 };
+
