@@ -23,9 +23,10 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     const getDefaultScoresForPlayer = async (player: any) => {
         const tournamentId = tournament?.id;
         const handicap = player.handicap;
+        console.log("fetching handicap scores for ", player.name, " (", tournamentId, ", ", handicap, ")")
         if (tournamentId !== undefined && handicap !== undefined) {
             try {
-                const res = await api.get(`/tournaments/${tournamentId}/${handicap}/score`);
+                const res = await api.get(`/tournaments/${tournamentId}/${handicap}/handicapScore`);
                 if (Array.isArray(res.data) && res.data.length > 0) {
                     return res.data.map((v: any, i: number) => Number(v) || getLocalDefaultScores()[i] || 3);
                 }

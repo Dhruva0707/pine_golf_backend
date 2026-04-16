@@ -101,7 +101,8 @@ public class FlightService {
         Course course = courseRepository.findById(courseId).orElseThrow();
         List<Integer> expectedPars = new ArrayList<>();
         for (int i = 0; i < 18; i++) {
-            int strokesReceived = (int) ((effectiveHandicap / 18) + (effectiveHandicap % 18 >= i ? 1 : 0));
+            int strokesReceived = (int) ((effectiveHandicap / 18) +
+                    (effectiveHandicap % 18 >= course.getIndexes().get(i) ? 1 : 0));
             expectedPars.add(course.getPars().get(i) + strokesReceived);
         }
 

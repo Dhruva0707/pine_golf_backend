@@ -101,7 +101,12 @@ public class SeasonScoringControllersTest {
         final String strategyType = "STABLEFORD";
 
         // create the test course
-        CourseDTO courseDTO = new CourseDTO(1L, TEST_COURSE, pars, indexes);
+        CourseDTO courseDTO = CourseDTO.builder()
+                .name(TEST_COURSE)
+                .pars(pars)
+                .indexes(indexes)
+                .build();
+
         sendRequest("/courses", objectMapper.writeValueAsString(courseDTO), token, HttpMethod.POST, restClient);
 
         TournamentController.TournamentCreateRequest tournamentCreateRequest =

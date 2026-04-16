@@ -123,14 +123,14 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getTournamentLeaderBoard(seasonName, tournamentName));
     }
 
-    @GetMapping("/{tournamentId}/{playerId}")
+    @GetMapping("/{tournamentId}/{playerId}/score")
     @Operation(summary = "Get the effective net par score for the player in that particular tournament")
     public ResponseEntity<List<Integer>> getTournamentExpectedScore(@PathVariable("tournamentId") Long tournamentId,
                                                                     @PathVariable("playerId") Long playerId) {
         return ResponseEntity.ok(tournamentService.getDefaultScores(tournamentId, playerId));
     }
 
-    @GetMapping("/{tournamentId}/{handicap}/score")
+    @GetMapping("/{tournamentId}/{handicap}/handicapScore")
     @Operation(summary = "Get the effective net par score for a given handicap in a tournament")
     public ResponseEntity<List<Integer>> getTournamentExpectedScoreByHandicap(@PathVariable("tournamentId") Long tournamentId,
                                                                               @PathVariable("handicap") double handicap) {
