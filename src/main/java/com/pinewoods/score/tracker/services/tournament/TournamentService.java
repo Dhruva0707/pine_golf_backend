@@ -176,9 +176,53 @@ public class TournamentService {
     public void deleteTournament(Long tournamentId) {
         Tournament tournament = tournamentRepo.findById(tournamentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
+
+        // Remove association from the Season so the bidirectional collection stays consistent
         Season season = tournament.getSeason();
-        season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+        if (season != null) {
+            season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+            seasonRepo.save(season);
+        }
+
+        // Clear the flights collection on the tournament so the join-table entries (tournament_flights)
+        // are removed by JPA when we save the tournament. This avoids manual SQL on the join table.
+        if (tournament.getFlights() != null && !tournament.getFlights().isEmpty()) {
+            tournament.getFlights().clear();
+            // Persist the cleared association to ensure join-table rows are deleted before deleting the tournament row
+            tournamentRepo.saveAndFlush(tournament);
+        }
+
+        // Finally delete the tournament record itself
         tournamentRepo.deleteById(tournamentId);
+
+        // Cleanup in-memory caches
+        activeStrategies.remove(tournamentId);
+        calculatedFlightCache.remove(tournamentId);
+    }
+
+    /**
+     * Deletes the tournament and also deletes all Flights and FlightScores associated with it.
+     * This relies on JPA cascading (Tournament -> Flight cascade = ALL, Flight -> FlightScore cascade = ALL
+     * with orphanRemoval on Flight->FlightScore) so Spring will remove dependent rows automatically.
+     */
+    @PreAuthorize( "hasRole('ADMIN')")
+    public void deleteTournamentWhole(Long tournamentId) {
+        Tournament tournament = tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
+
+        // Remove from season collection to keep bidirectional state consistent
+        Season season = tournament.getSeason();
+        if (season != null) {
+            season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+            seasonRepo.save(season);
+        }
+
+        // Delete the tournament entity. Because Tournament.flights is cascade = ALL,
+        // and Flight.flightScores is cascade = ALL with orphanRemoval, deleting the Tournament
+        // will cascade deletes to Flight and FlightScore rows (handled by JPA).
+        tournamentRepo.delete(tournament);
+
+        // Cleanup in-memory caches
         activeStrategies.remove(tournamentId);
         calculatedFlightCache.remove(tournamentId);
     }

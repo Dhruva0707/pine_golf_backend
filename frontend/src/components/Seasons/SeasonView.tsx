@@ -14,15 +14,24 @@ interface TeamStandingDTO {
     birdies: number;
 }
 
+interface LeaderboardEntryDTO {
+    playerName: string;
+    score: number;
+    birdies: number;
+}
+
 export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const [seasons, setSeasons] = useState<string[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [standings, setStandings] = useState<TeamStandingDTO[]>([]);
-    const [playerMap, setPlayerMap] = useState<Record<number, string>>({}); // ID -> Name
     const [isTourneyModalOpen, setIsTourneyModalOpen] = useState(false);
     const [activeTourneyForFlights, setActiveTourneyForFlights] = useState<any | null>(null);
     const [expandedFlights, setExpandedFlights] = useState<Record<number, boolean>>({});
+    const [leaderboardTournament, setLeaderboardTournament] = useState<any | null>(null);
+    const [leaderboard, setLeaderboard] = useState<LeaderboardEntryDTO[] | null>(null);
+    const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+    const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const sortedSeasons = useMemo(() => {
@@ -32,6 +41,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const sortedStandings = useMemo(() => {
         return [...standings].sort((a, b) => b.points - a.points);
     }, [standings]);
+
+    const sortedTournaments = useMemo(() => {
+        return [...tournaments].reverse();
+    }, [tournaments]);
 
     useEffect(() => {
         fetchSeasons();
@@ -51,11 +64,6 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const fetchPlayers = async () => {
         try {
             const res = await api.get('/players');
-            const mapping: Record<number, string> = {};
-            res.data.forEach((p: any) => {
-                mapping[p.id] = p.name;
-            });
-            setPlayerMap(mapping);
         } catch (err) { console.error("Failed to fetch players", err); }
     };
 
@@ -86,6 +94,27 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
             ]);
             setTournaments(tourneyRes.data);
             setStandings(standingsRes.data);
+        }
+    };
+
+    const loadLeaderboard = async (tournament: any) => {
+        if (!selectedSeason || !tournament?.name) return;
+        setLeaderboardTournament(tournament);
+        setLeaderboardLoading(true);
+        setLeaderboardError(null);
+        setLeaderboard(null);
+        try {
+            const res = await api.get(`/tournaments/${encodeURIComponent(selectedSeason)}/${encodeURIComponent(tournament.name)}/leaderBoard`);
+            setLeaderboard(res.data ?? null);
+        } catch (err: any) {
+            const status = err?.response?.status;
+            if (status === 404) {
+                setLeaderboard(null);
+            } else {
+                setLeaderboardError(err?.response?.data?.message || 'Failed to load leaderboard');
+            }
+        } finally {
+            setLeaderboardLoading(false);
         }
     };
 
@@ -171,6 +200,35 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         } catch (err: any) {
             console.error(err);
             alert(err.response?.data || 'Failed to import tournament');
+        }
+    };
+
+    const handleOpenTournamentManager = (tournament: any) => {
+        setLeaderboardTournament(null);
+        setLeaderboard(null);
+        setLeaderboardError(null);
+        setLeaderboardLoading(false);
+        setActiveTourneyForFlights({ ...tournament, seasonName: selectedSeason });
+    };
+
+    const handleOpenLeaderboard = async (tournament: any) => {
+        setActiveTourneyForFlights(null);
+        await loadLeaderboard({ ...tournament, seasonName: selectedSeason });
+    };
+
+    const handleCloseLeaderboard = () => {
+        setLeaderboardTournament(null);
+        setLeaderboard(null);
+        setLeaderboardError(null);
+        setLeaderboardLoading(false);
+    };
+
+    const handleFlightSaved = async () => {
+        const tournament = activeTourneyForFlights;
+        setActiveTourneyForFlights(null);
+        await fetchDataForSeason();
+        if (tournament) {
+            await loadLeaderboard({ ...tournament, seasonName: selectedSeason });
         }
     };
 
@@ -287,7 +345,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
 
                         {/* Tournaments with Player Name Awards */}
                         <div className="space-y-4">
-                            {tournaments.map(t => (
+                            {sortedTournaments.map(t => (
                                 <div key={t.id} className="bg-white rounded-2xl border border-latte-crust overflow-hidden shadow-sm">
                                     {t.awards && Object.keys(t.awards).length > 0 && (
                                         <div className="bg-latte-yellow/10 p-4 border-b border-latte-yellow/20 flex gap-4 overflow-x-auto">
@@ -322,7 +380,10 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                             <button onClick={() => setExpandedFlights(prev => ({ ...prev, [t.id]: !prev[t.id] }))} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
                                                 <ChevronRight size={16} className={`${expandedFlights[t.id] ? 'rotate-90' : ''} transition-transform`} /> View Flights
                                             </button>
-                                            <button onClick={() => setActiveTourneyForFlights({...t, seasonName: selectedSeason})} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                            <button onClick={() => handleOpenLeaderboard(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
+                                                <Settings2 size={16} /> Leaderboard
+                                            </button>
+                                            <button onClick={() => handleOpenTournamentManager(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
                                                 <Settings2 size={16} /> Manage
                                             </button>
                                             {isAdmin && (
@@ -337,6 +398,55 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                             )}
                                         </div>
                                     </div>
+
+                                    {leaderboardTournament?.id === t.id && (
+                                        <div className="px-5 pb-5">
+                                            <div className="border border-latte-crust rounded-2xl overflow-hidden bg-latte-base/20">
+                                                <div className="p-5 border-b border-latte-crust flex items-center justify-between gap-4 bg-white">
+                                                    <div>
+                                                        <h3 className="font-black text-latte-text flex items-center gap-2">
+                                                            <Trophy size={18} className="text-latte-mauve" /> {leaderboardTournament.name} Leaderboard
+                                                        </h3>
+                                                        <p className="text-xs text-latte-subtext font-bold uppercase tracking-widest">Season {selectedSeason}</p>
+                                                    </div>
+                                                    <button onClick={handleCloseLeaderboard} className="text-sm font-bold text-latte-subtext hover:text-latte-text">
+                                                        Close
+                                                    </button>
+                                                </div>
+                                                <div className="p-5">
+                                                    {leaderboardLoading && <div className="text-sm font-bold text-latte-subtext">Loading leaderboard...</div>}
+                                                    {!leaderboardLoading && leaderboardError && <div className="text-sm font-bold text-latte-subtext">{leaderboardError}</div>}
+                                                    {!leaderboardLoading && !leaderboardError && leaderboard === null && (
+                                                        <div className="text-sm font-bold text-latte-subtext/80 bg-latte-base/50 border border-latte-crust rounded-xl p-4">
+                                                            Leaderboards are only available for active tournaments with existing flights
+                                                        </div>
+                                                    )}
+                                                    {!leaderboardLoading && !leaderboardError && leaderboard && leaderboard.length === 0 && (
+                                                        <div className="text-sm font-bold text-latte-subtext">No leaderboard entries yet.</div>
+                                                    )}
+                                                    {!leaderboardLoading && !leaderboardError && leaderboard && leaderboard.length > 0 && (
+                                                        <div className="space-y-3">
+                                                            {leaderboard
+                                                                .slice()
+                                                                .sort((a, b) => b.score - a.score)
+                                                                .map((entry, idx) => (
+                                                                    <div key={`${entry.playerName}-${idx}`} className="bg-latte-base p-4 rounded-2xl border border-latte-crust flex items-center justify-between shadow-sm">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <span className="text-xs font-black text-latte-subtext w-4">#{idx + 1}</span>
+                                                                            <span className="font-bold text-latte-text">{entry.playerName}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4">
+                                                                            <span className="text-[10px] font-black text-latte-blue uppercase">Birdies: {entry.birdies}</span>
+                                                                            <span className="bg-latte-mauve text-white px-3 py-1 rounded-lg font-black">{entry.score}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {expandedFlights[t.id] && (
                                         <div className="px-5 pb-5">
@@ -376,6 +486,12 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                         </div>
                     </>
                 )}
+
+                {leaderboardTournament && (
+                    <div className="hidden">
+                        {/* leaderboard is rendered within its tournament card */}
+                    </div>
+                )}
             </div>
 
             {isAdmin && (
@@ -388,7 +504,8 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                 />
             )}
             <AddTournamentModal isOpen={isTourneyModalOpen} onClose={() => setIsTourneyModalOpen(false)} seasonName={selectedSeason || ''} onSuccess={fetchDataForSeason} />
-            <FlightManagerModal isOpen={!!activeTourneyForFlights} onClose={() => { setActiveTourneyForFlights(null); fetchDataForSeason(); }} tournament={activeTourneyForFlights} />
+            <FlightManagerModal isOpen={!!activeTourneyForFlights} onClose={handleFlightSaved} tournament={activeTourneyForFlights} />
         </div>
     );
 };
+

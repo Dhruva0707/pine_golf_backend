@@ -23,6 +23,7 @@ import java.util.*;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Tournament {
     @Id
+    @EqualsAndHashCode.Include
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
@@ -32,7 +33,7 @@ public class Tournament {
     @ManyToOne
     private Season season;
 
-    @OneToMany(cascade = CascadeType.ALL)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinTable(
             name = "tournament_flights",
             joinColumns = @JoinColumn(name = "tournament_id"),
