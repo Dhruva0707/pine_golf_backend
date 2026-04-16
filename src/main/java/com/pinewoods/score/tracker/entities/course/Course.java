@@ -41,7 +41,7 @@ public class Course {
     private List<Integer> indexes = new ArrayList<>();
 
     public CourseDTO toDTO() {
-        return new CourseDTO(name, pars, indexes);
+        return new CourseDTO(id, name, pars, indexes);
     }
 }
 

@@ -71,4 +71,11 @@ public class FlightController {
     public ResponseEntity<List<FlightDTO>> getAllFlights() {
         return ResponseEntity.ok(flightService.getAllFlights().stream().map(Flight::toDTO).toList());
     }
+
+    @GetMapping("/{courseId}/{handicap}")
+    @Operation(summary = "Get the effective net par score for the player in that particular tournament")
+    public ResponseEntity<List<Integer>> getExpectedScore(@PathVariable("courseId") Long courseId,
+                                                                    @PathVariable("handicap") double handicap) {
+        return ResponseEntity.ok(flightService.getDefaultScores(courseId, handicap));
+    }
 }

@@ -11,6 +11,11 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
     List<Integer> pars;
     List<Integer> indexes;
     String courseName;
+    double handicapMultiplier;
+
+    protected BaseScoringStrategy(double handicapMultiplier) {
+        this.handicapMultiplier = handicapMultiplier;
+    }
 
     @Override
     public String getCourseName() {
@@ -30,5 +35,8 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
         return birdies;
     }
 
-
+    @Override
+    public double getHandicapMultiplier() {
+        return handicapMultiplier > 0 ? handicapMultiplier : 1;
+    }
 }

@@ -12,15 +12,19 @@ import java.util.List;
 public class StrokeplayScoringStrategy extends BaseScoringStrategy {
 
     PlayerRepository playerRepo;
-    final double handicapMultiplier;
     final int totalPar;
 
     public StrokeplayScoringStrategy(List<Integer> pars, String courseName, PlayerRepository playerRepo,
                                      double handicapMultiplier) {
+        super(handicapMultiplier);
+
+        if (pars.size() != 18 || indexes.size() != 18) {
+            throw new IllegalArgumentException("Pars and indexes must be of length 18");
+        }
+
         this.pars = pars;
         this.courseName = courseName;
         this.playerRepo = playerRepo;
-        this.handicapMultiplier = handicapMultiplier;
         totalPar = pars.stream().mapToInt(Integer::intValue).sum();
     }
 

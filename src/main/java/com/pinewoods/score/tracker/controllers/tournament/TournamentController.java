@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtilities;
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.course.CourseRepository;
-import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
@@ -22,8 +21,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.Size;
-import jakarta.websocket.server.PathParam;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +35,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/tournaments")
@@ -127,14 +123,26 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getTournamentLeaderBoard(seasonName, tournamentName));
     }
 
+    @GetMapping("/{tournamentId}/{playerId}")
+    @Operation(summary = "Get the effective net par score for the player in that particular tournament")
+    public ResponseEntity<List<Integer>> getTournamentExpectedScore(@PathVariable("tournamentId") Long tournamentId,
+                                                                    @PathVariable("playerId") Long playerId) {
+        return ResponseEntity.ok(tournamentService.getDefaultScores(tournamentId, playerId));
+    }
+
+    @GetMapping("/{tournamentId}/{handicap}/score")
+    @Operation(summary = "Get the effective net par score for a given handicap in a tournament")
+    public ResponseEntity<List<Integer>> getTournamentExpectedScoreByHandicap(@PathVariable("tournamentId") Long tournamentId,
+                                                                              @PathVariable("handicap") double handicap) {
+        return ResponseEntity.ok(tournamentService.getDefaultScoresByHandicap(tournamentId, handicap));
+    }
+
     // ------------ Delete Tournament -----------
-    @DeleteMapping("/{seasonName}/{tournamentName}")
+    @DeleteMapping("/{tournamentId}")
     @Operation(summary = "Delete a tournament by name")
-    public ResponseEntity<Void> deleteTournament(@PathVariable("tournamentName") String tournamentName,
-                                                 @PathVariable("seasonName") String seasonName) {
-        Tournament t = tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName);
-        Long id = t.getId();
-        tournamentService.deleteTournament(id);
+    public ResponseEntity<Void> deleteTournament(@PathVariable("tournamentId") Long tournamentId) {
+
+        tournamentService.deleteTournament(tournamentId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 

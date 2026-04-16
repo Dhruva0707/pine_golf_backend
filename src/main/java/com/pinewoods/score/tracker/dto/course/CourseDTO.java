@@ -10,8 +10,8 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class CourseDTO {
+    private Long id;
     private String name;
     private List<Integer> pars;
     private List<Integer> indexes;
 }
-

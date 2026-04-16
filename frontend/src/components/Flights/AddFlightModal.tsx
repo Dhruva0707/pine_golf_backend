@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Trophy, Award, Trash2 } from 'lucide-react';
 import api from '../../api/client';
-import confetti from 'canvas-confetti';
 
 export interface FlightManagerModalProps {
     isOpen: boolean;
@@ -15,6 +14,27 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     const [flightRows, setFlightRows] = useState<{player: any, scores: number[]}[]>([]);
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [isFinished, setIsFinished] = useState(false);
+
+    const getLocalDefaultScores = () => {
+        const pars = tournament?.course?.pars ?? tournament?.pars ?? [];
+        return Array.from({ length: 18 }, (_, i) => Number(pars[i]) || 3);
+    };
+
+    const getDefaultScoresForPlayer = async (player: any) => {
+        const tournamentId = tournament?.id;
+        const handicap = player.handicap;
+        if (tournamentId !== undefined && handicap !== undefined) {
+            try {
+                const res = await api.get(`/tournaments/${tournamentId}/${handicap}/score`);
+                if (Array.isArray(res.data) && res.data.length > 0) {
+                    return res.data.map((v: any, i: number) => Number(v) || getLocalDefaultScores()[i] || 3);
+                }
+            } catch (err) {
+                console.error('Failed to fetch handicap-based expected scores', err);
+            }
+        }
+        return getLocalDefaultScores();
+    };
 
     // --- Effects ---
     useEffect(() => {
@@ -38,11 +58,12 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     };
 
     // --- Logic ---
-    const addPlayerToFlight = (playerName: string) => {
+    const addPlayerToFlight = async (playerName: string) => {
         if (!playerName) return;
         const playerObj = players.find(p => p.name === playerName);
         if (playerObj) {
-            setFlightRows(prev => [...prev, { player: playerObj, scores: Array(18).fill(3) }]);
+            const scores = await getDefaultScoresForPlayer(playerObj);
+            setFlightRows(prev => [...prev, { player: playerObj, scores }]);
             setSelectedPlayerId('');
         }
     };
@@ -68,21 +89,6 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
         }
     };
 
-    const handleEndTournament = async () => {
-        if (window.confirm("Finalize tournament? This calculates winners and updates standings.")) {
-            try {
-                await api.post(`/tournaments/${tournament.id}/end`);
-                setIsFinished(true);
-                confetti({
-                    particleCount: 150,
-                    spread: 70,
-                    origin: { y: 0.6 }
-                });
-            } catch (err) {
-                alert("Failed to end tournament.");
-            }
-        }
-    };
 
     if (!isOpen || !tournament) return null;
 
@@ -99,11 +105,6 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
                         <p className="text-xs font-bold text-latte-subtext uppercase tracking-widest">Flight & Score Management</p>
                     </div>
                     <div className="flex items-center gap-4">
-                        {!isFinished && (
-                            <button onClick={handleEndTournament} className="bg-latte-red text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:brightness-110">
-                                End Tournament
-                            </button>
-                        )}
                         <button onClick={onClose} className="text-latte-subtext hover:text-latte-red"><X /></button>
                     </div>
                 </div>
