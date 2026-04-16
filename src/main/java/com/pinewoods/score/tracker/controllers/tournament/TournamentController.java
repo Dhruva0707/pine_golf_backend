@@ -90,10 +90,11 @@ public class TournamentController {
                     Accepts a list of player scorecards for a single flight.
                     Calculates scores immediately using the active strategy.
                     """)
-    public ResponseEntity<FlightDTO> addFlight(
+    public ResponseEntity<Void> addFlight(
             @Parameter(description = "ID of the active tournament") @PathVariable Long id,
             @Valid @RequestBody List<ScoreCardDTO> cards) {
-        return ResponseEntity.ok(tournamentService.addScorecards(id, cards).toDTO());
+        tournamentService.addScorecards(id, cards);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/end")

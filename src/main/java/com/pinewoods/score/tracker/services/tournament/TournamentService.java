@@ -85,7 +85,7 @@ public class TournamentService {
      * @return FlightDTO representing the flight
      */
     @PreAuthorize( "hasRole('ADMIN')")
-    public Flight addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
+    public void addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
         Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
         IScoringStrategy strategy = activeStrategies.get(tournamentId);
 
@@ -109,9 +109,6 @@ public class TournamentService {
 
         calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
         calculatedFlightCache.get(tournamentId).add(calculatedFlight);
-
-        // Convert to DTO for the frontend
-        return calculatedFlight;
     }
 
     /**
@@ -180,9 +177,10 @@ public class TournamentService {
         Tournament tournament = tournamentRepo.findById(tournamentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tournament not found"));
         Season season = tournament.getSeason();
-        season.getTournaments().remove(tournament);
-        tournamentRepo.delete(tournament);
+        season.getTournaments().removeIf(t -> t.getId() == tournamentId);
+        tournamentRepo.deleteById(tournamentId);
         activeStrategies.remove(tournamentId);
+        calculatedFlightCache.remove(tournamentId);
     }
 
     // ============= Utilities =============

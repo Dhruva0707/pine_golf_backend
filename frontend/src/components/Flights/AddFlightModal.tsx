@@ -13,6 +13,7 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     // --- State ---
     const [players, setPlayers] = useState<any[]>([]);
     const [flights, setFlights] = useState<any[]>([]);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'entry' | 'leaderboard'>('entry');
     const [flightRows, setFlightRows] = useState<{player: any, scores: number[]}[]>([]);
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
@@ -34,8 +35,22 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
             ]);
             setPlayers(pRes.data);
             if (tRes.data.flights) setFlights(tRes.data.flights);
+            // Try live leaderboard for active tournaments; fallback to flights if it fails
+            if (!tournament.isFinished) {
+                try {
+                    const lbRes = await api.get(`/tournaments/${tournament.seasonName}/${tournament.name}/leaderBoard`);
+                    setLeaderboard(lbRes.data || []);
+                } catch (e) {
+                    // Fallback: keep leaderboard null so UI uses flights flattening
+                    setLeaderboard(null);
+                }
+            } else {
+                setLeaderboard(null);
+            }
         } catch (err) {
             console.error("Failed to load flight data", err);
+            // On total failure, ensure leaderboard falls back
+            setLeaderboard(null);
         }
     };
 
@@ -210,19 +225,21 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
                             </div>
                         ) : (
                             <div className="max-w-2xl mx-auto space-y-3 animate-in slide-in-from-bottom-4 duration-300">
-                                {flights.flatMap(f => f.flights || []).sort((a, b) => b.score - a.score).map((fs, idx) => (
-                                    <div key={idx} className="bg-white p-4 rounded-2xl border border-latte-crust flex justify-between items-center shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs font-black text-latte-subtext w-4">#{idx+1}</span>
-                                            <span className="font-bold">{fs.playerName}</span>
+                                {(leaderboard ?? flights.flatMap(f => f.flights || []))
+                                    .sort((a, b) => b.score - a.score)
+                                    .map((fs, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-2xl border border-latte-crust flex justify-between items-center shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-black text-latte-subtext w-4">#{idx+1}</span>
+                                                <span className="font-bold">{fs.playerName}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-[10px] font-black text-latte-blue uppercase">Birdies: {fs.birdies}</span>
+                                                <span className="bg-latte-mauve text-white px-3 py-1 rounded-lg font-black">{fs.score}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className="text-[10px] font-black text-latte-blue uppercase">Birdies: {fs.birdies}</span>
-                                            <span className="bg-latte-mauve text-white px-3 py-1 rounded-lg font-black">{fs.score}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                                {flights.length === 0 && (
+                                    ))}
+                                {leaderboard === null && flights.length === 0 && (
                                     <div className="text-center py-10 text-latte-subtext italic">No scores recorded yet.</div>
                                 )}
                             </div>
