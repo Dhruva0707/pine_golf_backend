@@ -45,6 +45,6 @@ public class Player {
     private List<FlightScore> flightScores;
 
     public PlayerDTO toDTO() {
-        return new PlayerDTO(name, team.getName(), handicap);
+        return new PlayerDTO(name, team.getName(), handicap, id);
     }
 }
