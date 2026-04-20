@@ -2,7 +2,6 @@ package com.pinewoods.score.tracker.services.scoring;
 
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
-import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import jakarta.validation.constraints.NotNull;
@@ -33,29 +32,29 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
     }
 
     @Override
-    public Flight calculateScores(List<ScoreCardDTO> cards) {
-        Flight flight = Flight.builder()
+    public Flight calculateScores(Flight flight) {
+        Flight calculatedFlight = Flight.builder()
                 .date(new Date())
                 .build();
 
-        for (ScoreCardDTO card : cards) {
-            PlayerDTO player = card.player();
+        for (FlightScore card : flight.getFlightScores()) {
+            PlayerDTO player = card.getPlayer().toDTO();
             int handicap = (int) Math.round(player.handicap() * handicapMultiplier);
 
             // Perform the handicap/par/index math we discussed
-            int totalPoints = calculateScore(card.holeScores(), handicap);
-            int birdies = countBirdies(card.holeScores());
+            int totalPoints = calculateScore(card.getHoleScores(), handicap);
+            int birdies = countBirdies(card.getHoleScores());
 
             FlightScore fs = FlightScore.builder()
                     .player(playerRepo.findByName(player.name()).orElseThrow())
                     .score(totalPoints)
                     .birdies(birdies)
-                    .flight(flight) // Set back-reference
+                    .flight(calculatedFlight) // Set back-reference
                     .build();
 
-            flight.getFlightScores().add(fs);
+            calculatedFlight.getFlightScores().add(fs);
         }
-        return flight;
+        return calculatedFlight;
     }
 
     @Override

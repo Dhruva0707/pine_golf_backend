@@ -40,8 +40,11 @@ public class Course {
     @UniqueElements(message = "Stroke indexes must be unique")
     private List<Integer> indexes = new ArrayList<>();
 
+    private double slopeRating;
+    private double courseRating;
+
     public CourseDTO toDTO() {
-        return new CourseDTO(id, name, pars, indexes);
+        return new CourseDTO(id, name, pars, indexes, slopeRating, courseRating);
     }
 }
 

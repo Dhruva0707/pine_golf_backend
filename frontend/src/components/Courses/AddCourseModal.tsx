@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {X, Plus, Info, Zap} from 'lucide-react';
 import api from '../../api/client';
 
@@ -13,6 +13,27 @@ export const AddCourseModal = ({isOpen, onClose, onSuccess, editData}: AddCourse
     const [name, setName] = useState('');
     const [pars, setPars] = useState<number[]>(Array(18).fill(3));
     const [indexes, setIndexes] = useState<number[]>(Array.from({length: 18}, (_, i) => i + 1));
+    const [slopeRating, setSlopeRating] = useState<number>(0);
+    const [courseRating, setCourseRating] = useState<number>(0);
+
+    // When opening the modal in edit mode, prefill the fields
+    useEffect(() => {
+        if (!isOpen) return;
+        if (editData) {
+            setName(editData.name ?? '');
+            setPars(Array.isArray(editData.pars) ? editData.pars : Array(18).fill(3));
+            setIndexes(Array.isArray(editData.indexes) ? editData.indexes : Array.from({length: 18}, (_, i) => i + 1));
+            setSlopeRating(typeof editData.slopeRating === 'number' ? editData.slopeRating : 0);
+            setCourseRating(typeof editData.courseRating === 'number' ? editData.courseRating : 0);
+        } else {
+            // reset for create
+            setName('');
+            setPars(Array(18).fill(3));
+            setIndexes(Array.from({length: 18}, (_, i) => i + 1));
+            setSlopeRating(0);
+            setCourseRating(0);
+        }
+    }, [isOpen, editData]);
 
     if (!isOpen) return null;
 
@@ -24,15 +45,34 @@ export const AddCourseModal = ({isOpen, onClose, onSuccess, editData}: AddCourse
         e.preventDefault();
         if (!name) return alert("Course name is required");
 
+        // Validate ratings
+        if (isNaN(slopeRating) || isNaN(courseRating)) {
+            return alert('Please enter valid numeric values for slope rating and course rating');
+        }
+
+        const payload = {name, pars, indexes, slopeRating, courseRating};
+
         try {
-            await api.post('/courses', {name, pars, indexes});
+            if (editData) {
+                // Update existing course - assume PUT /courses/{originalName}
+                await api.put(`/courses/${encodeURIComponent(editData.name)}`, payload);
+            } else {
+                // Create new course
+                await api.post('/courses', payload);
+            }
+
             onSuccess();
             onClose();
+
+            // reset local state after save
             setName('');
             setPars(Array(18).fill(3));
+            setIndexes(Array.from({length: 18}, (_, i) => i + 1));
+            setSlopeRating(0);
+            setCourseRating(0);
         } catch (err) {
             console.error(err);
-            alert("Failed to save course. Ensure the name is unique.");
+            alert("Failed to save course. Ensure the name is unique and your input is valid.");
         }
     };
 
@@ -46,7 +86,7 @@ export const AddCourseModal = ({isOpen, onClose, onSuccess, editData}: AddCourse
                     className="p-8 border-b border-latte-base flex justify-between items-center bg-white sticky top-0 rounded-t-3xl z-10">
                     <div>
                         <h3 className="text-2xl font-black flex items-center gap-2 text-latte-green">
-                            <Plus size={28}/> Define New Course
+                            <Plus size={28}/> {editData ? 'Edit Course' : 'Define New Course'}
                         </h3>
                         <p className="text-[10px] font-bold text-latte-subtext uppercase tracking-widest mt-1">Configure
                             Pars and Difficulty Indexes</p>
@@ -66,6 +106,33 @@ export const AddCourseModal = ({isOpen, onClose, onSuccess, editData}: AddCourse
                             value={name}
                             onChange={e => setName(e.target.value)}
                         />
+                    </div>
+
+                    {/* Slope & Course Rating Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black uppercase text-latte-subtext ml-1">Slope Rating</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                className="w-full text-lg font-bold p-3 bg-latte-base/30 rounded-2xl outline-none focus:ring-2 focus:ring-latte-green border border-transparent focus:border-latte-green transition-all"
+                                placeholder="e.g. 113"
+                                value={slopeRating}
+                                onChange={e => setSlopeRating(parseFloat(e.target.value) || 0)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-black uppercase text-latte-subtext ml-1">Course Rating</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                className="w-full text-lg font-bold p-3 bg-latte-base/30 rounded-2xl outline-none focus:ring-2 focus:ring-latte-green border border-transparent focus:border-latte-green transition-all"
+                                placeholder="e.g. 72.4"
+                                value={courseRating}
+                                onChange={e => setCourseRating(parseFloat(e.target.value) || 0)}
+                            />
+                        </div>
                     </div>
 
                     {/* Quick Set Bar */}

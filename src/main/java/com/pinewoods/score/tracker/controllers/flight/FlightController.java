@@ -5,6 +5,7 @@ import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.services.flight.FlightService;
+import com.pinewoods.score.tracker.services.tournament.TournamentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,10 +24,13 @@ import java.util.List;
 @Tag(name = "Flight Management", description = "Operations related to golf flights and scores")
 public class FlightController {
 
+    private final TournamentService tournamentService;
+
     FlightService flightService;
 
-    public FlightController(FlightService flightService) {
+    public FlightController(FlightService flightService, TournamentService tournamentService) {
         this.flightService = flightService;
+        this.tournamentService = tournamentService;
     }
 
     // --------- Create Flight ------------
@@ -48,6 +52,19 @@ public class FlightController {
         URI resourceUri = ControllerUtilities.createResourceURI("id", createdFlight.getId());
         return ResponseEntity.created(resourceUri)
                 .body(createdFlight.toDTO());
+    }
+
+    // --------- Push Flight ------------
+    @Operation(
+        summary = "Push a flight to a tournament",
+        description = "Pushes a flight to a tournament, associating it with the specified tournament ID.",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @PatchMapping("/{id}/{tournamentId}/link")
+    public ResponseEntity<Void> pushFlightToTournament(@PathVariable long id, @PathVariable long tournamentId) {
+        tournamentService.addFlightToTournament(id, tournamentId);
+
+        return ResponseEntity.ok().build();
     }
 
     // ---------- Read Flight --------------
@@ -72,10 +89,10 @@ public class FlightController {
         return ResponseEntity.ok(flightService.getAllFlights().stream().map(Flight::toDTO).toList());
     }
 
-    @GetMapping("/{courseId}/{handicap}")
+    @GetMapping("/{courseId}/{playerId}")
     @Operation(summary = "Get the effective net par score for the player in that particular tournament")
     public ResponseEntity<List<Integer>> getExpectedScore(@PathVariable("courseId") Long courseId,
-                                                                    @PathVariable("handicap") double handicap) {
+                                                                    @PathVariable("playerId") Long handicap) {
         return ResponseEntity.ok(flightService.getDefaultScores(courseId, handicap));
     }
 }

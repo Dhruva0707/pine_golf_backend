@@ -34,12 +34,15 @@ public class FlightService {
     private final FlightScoreRepository flightScoreRepository;
     private final CourseRepository courseRepository;
 
+    private final CourseService courseService;
+
     public FlightService(FlightRepository flightRepository, PlayerRepository playerRepository, FlightScoreRepository flightScoreRepository,
-        CourseRepository courseRepository) {
+        CourseRepository courseRepository, CourseService courseService) {
         this.flightRepository = flightRepository;
         this.playerRepository = playerRepository;
         this.flightScoreRepository = flightScoreRepository;
         this.courseRepository = courseRepository;
+        this.courseService = courseService;
     }
 
     // ----------- Create Flight -----------
@@ -96,13 +99,24 @@ public class FlightService {
         return flightRepository.findAll();
     }
 
-    public List<Integer> getDefaultScores(Long courseId, double effectiveHandicap) {
-        // fetch the pars for the course
+    public List<Integer> getDefaultScores(Long courseId, Long playerId, double handicapMultiplier) {
+        double effectiveHandicap = courseService.getCourseHandicap(playerId, courseId).getHandicap() * handicapMultiplier;
+
+        return getDefaultScore(courseId, effectiveHandicap);
+    }
+
+    public List<Integer> getDefaultScores(Long courseId, Long playerId) {
+        double effectiveHandicap = courseService.getCourseHandicap(playerId, courseId).getHandicap();
+
+        return getDefaultScore(courseId, effectiveHandicap);
+    }
+
+    private List<Integer> getDefaultScore(Long courseId, double effectiveHandicap) {
         Course course = courseRepository.findById(courseId).orElseThrow();
         List<Integer> expectedPars = new ArrayList<>();
         for (int i = 0; i < 18; i++) {
             int strokesReceived = (int) ((effectiveHandicap / 18) +
-                    (effectiveHandicap % 18 >= course.getIndexes().get(i) ? 1 : 0));
+                (effectiveHandicap % 18 >= course.getIndexes().get(i) ? 1 : 0));
             expectedPars.add(course.getPars().get(i) + strokesReceived);
         }
 

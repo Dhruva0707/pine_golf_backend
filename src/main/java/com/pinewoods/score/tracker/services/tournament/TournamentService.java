@@ -6,10 +6,8 @@ import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dao.season.SeasonRepository;
 import com.pinewoods.score.tracker.dao.season.TeamStandingRepository;
 import com.pinewoods.score.tracker.dao.tournament.TournamentRepository;
-import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
-import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.admin.Team;
@@ -20,12 +18,13 @@ import com.pinewoods.score.tracker.entities.season.TeamStanding;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
+import com.pinewoods.score.tracker.services.course.CourseService;
 import com.pinewoods.score.tracker.services.flight.FlightService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.transaction.Transactional;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +42,7 @@ public class TournamentService {
     private final PlayerRepository playerRepo;
     private final TeamStandingRepository standingRepo;
     private final CourseRepository courseRepo;
+    private final CourseService courseService;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
     private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
@@ -90,61 +90,9 @@ public class TournamentService {
             throw new ResourceConflictException("Tournament session expired or not initialized");
         }
 
-        // calculate effective handicap
-        double effectiveHandicap = playerRepo.findById(playerId).orElseThrow().getHandicap() * strategy.getHandicapMultiplier();
-
         Long courseId = courseRepo.findByName(strategy.getCourseName()).orElseThrow().getId();
 
-        return flightService.getDefaultScores(courseId, effectiveHandicap);
-    }
-
-    public List<Integer> getDefaultScoresByHandicap(Long tournamentId, double handicap) {
-        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
-        IScoringStrategy strategy = activeStrategies.get(tournamentId);
-
-        if (strategy == null || tournament.isFinished()) {
-            throw new ResourceConflictException("Tournament session expired or not initialized");
-        }
-
-        double effectiveHandicap = handicap * strategy.getHandicapMultiplier();
-
-        Long courseId = courseRepo.findByName(strategy.getCourseName()).orElseThrow().getId();
-
-        return flightService.getDefaultScores(courseId, effectiveHandicap);
-    }
-
-    /**
-     * Adds scorecards to a tournament.
-     *
-     * @param tournamentId tournament id
-     * @param cards scorecards for the flight
-     * @return FlightDTO representing the flight
-     */
-    @PreAuthorize( "hasRole('ADMIN')")
-    public void addScorecards(Long tournamentId, List<ScoreCardDTO> cards) {
-        Tournament tournament = tournamentRepo.findById(tournamentId).orElseThrow();
-        IScoringStrategy strategy = activeStrategies.get(tournamentId);
-
-        if (strategy == null || tournament.isFinished()) {
-            throw new ResourceConflictException("Tournament session expired or not initialized");
-        }
-
-        // Use our Strategy to transform ScoreCards into a Flight entity
-        Flight calculatedFlight = strategy.calculateScores(cards);
-        Flight flight = createFlight(cards, strategy);
-        tournament.getFlights().add(flight);
-
-        // update birdies in standing for each team
-        for (FlightScore fs : calculatedFlight.getFlightScores()) {
-            Team team = fs.getPlayer().getTeam();
-            standingRepo.findBySeasonNameAndTeamName(tournament.getSeason().getName(), team.getName())
-                    .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
-        }
-
-        tournamentRepo.saveAndFlush(tournament); // Cascades to Flight and FlightScores
-
-        calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
-        calculatedFlightCache.get(tournamentId).add(calculatedFlight);
+        return flightService.getDefaultScores(courseId, playerId, strategy.getHandicapMultiplier());
     }
 
     /**
@@ -207,6 +155,11 @@ public class TournamentService {
                         " not found in season " + seasonName));
     }
 
+    public Tournament getTournament(Long tournamentId) {
+        return tournamentRepo.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tournament " + tournamentId + " not found"));
+    }
+
     // ================ Delete Tournament ======================
     @PreAuthorize( "hasRole('ADMIN')")
     public void deleteTournament(Long tournamentId) {
@@ -261,34 +214,6 @@ public class TournamentService {
         // Cleanup in-memory caches
         activeStrategies.remove(tournamentId);
         calculatedFlightCache.remove(tournamentId);
-    }
-
-    // ============= Utilities =============
-
-    private Flight createFlight(List<ScoreCardDTO> cards, IScoringStrategy strategy) {
-        Flight flight = Flight.builder()
-                .date(new Date())
-                .build();
-
-        for (ScoreCardDTO card : cards) {
-            PlayerDTO player = card.player();
-
-            // Perform the handicap/par/index math we discussed
-            int totalPoints = card.holeScores().stream().mapToInt(Integer::intValue).sum();
-            int birdies = strategy.countBirdies(card.holeScores());
-
-            FlightScore fs = FlightScore.builder()
-                    .player(playerRepo.findByName(player.name()).orElseThrow())
-                    .score(totalPoints)
-                    .holeScores(card.holeScores())
-                    .courseName(strategy.getCourseName())
-                    .birdies(birdies)
-                    .flight(flight) // Set back-reference
-                    .build();
-
-            flight.getFlightScores().add(fs);
-        }
-        return flight;
     }
 
     private void calculateFinalAwards(Tournament tournament, Map<Long, Integer> pointsMap) {
@@ -374,6 +299,31 @@ public class TournamentService {
             });
 
         return leaderBoard;
+    }
+
+    public void addFlightToTournament(long flightId, long tournamentId) {
+        Flight flight = flightService.getFlight(flightId);
+        Tournament tournament = getTournament(tournamentId);
+
+        IScoringStrategy strategy = activeStrategies.get(tournamentId);
+
+        if (strategy == null || tournament.isFinished()) {
+            throw new ResourceConflictException("Tournament session expired");
+        }
+
+        Flight calculatedFlight = strategy.calculateScores(flight);
+        tournament.getFlights().add(flight);
+
+        for (FlightScore fs : calculatedFlight.getFlightScores()) {
+            Team team = fs.getPlayer().getTeam();
+            standingRepo.findBySeasonNameAndTeamName(tournament.getSeason().getName(), team.getName())
+                .ifPresent(standing -> standing.setBirdies(standing.getBirdies() + fs.getBirdies()));
+        }
+
+        tournamentRepo.save(tournament); // Cascades to Flight and FlightScores
+
+        calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
+        calculatedFlightCache.get(tournamentId).add(calculatedFlight);
     }
 
     // ============== Import and export ===============

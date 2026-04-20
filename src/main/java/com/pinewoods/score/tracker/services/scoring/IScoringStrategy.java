@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public interface IScoringStrategy {
-    Flight calculateScores(List<ScoreCardDTO> scoreCards);
+    Flight calculateScores(Flight flight);
 
     String getName();
 

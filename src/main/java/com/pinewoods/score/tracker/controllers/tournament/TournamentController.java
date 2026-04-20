@@ -5,7 +5,6 @@ import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtiliti
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
-import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
@@ -14,7 +13,6 @@ import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import com.pinewoods.score.tracker.services.scoring.ScoringStrategyFactory;
 import com.pinewoods.score.tracker.services.tournament.TournamentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -80,19 +78,6 @@ public class TournamentController {
         return ResponseEntity.created(resultUri).body(tournamentDTO);
     }
 
-    @PostMapping("/{id}/flights")
-    @Operation(summary = "Add a scorecard",
-            description = """
-                    Accepts a list of player scorecards for a single flight.
-                    Calculates scores immediately using the active strategy.
-                    """)
-    public ResponseEntity<Void> addFlight(
-            @Parameter(description = "ID of the active tournament") @PathVariable Long id,
-            @Valid @RequestBody List<ScoreCardDTO> cards) {
-        tournamentService.addScorecards(id, cards);
-        return ResponseEntity.noContent().build();
-    }
-
     @PostMapping("/{id}/end")
     @Operation(summary = "End and finalize the tournament",
             description = "Calculates awards (100/66/33), updates team standings, and clears the session from memory.")
@@ -128,13 +113,6 @@ public class TournamentController {
     public ResponseEntity<List<Integer>> getTournamentExpectedScore(@PathVariable("tournamentId") Long tournamentId,
                                                                     @PathVariable("playerId") Long playerId) {
         return ResponseEntity.ok(tournamentService.getDefaultScores(tournamentId, playerId));
-    }
-
-    @GetMapping("/{tournamentId}/{handicap}/handicapScore")
-    @Operation(summary = "Get the effective net par score for a given handicap in a tournament")
-    public ResponseEntity<List<Integer>> getTournamentExpectedScoreByHandicap(@PathVariable("tournamentId") Long tournamentId,
-                                                                              @PathVariable("handicap") double handicap) {
-        return ResponseEntity.ok(tournamentService.getDefaultScoresByHandicap(tournamentId, handicap));
     }
 
     // ------------ Delete Tournament -----------

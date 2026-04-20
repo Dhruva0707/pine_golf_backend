@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Trash2, User, Plus, Search, Lock, Edit2, UserRoundPen } from 'lucide-react';
 import api from '../../api/client';
 import { AddPlayerModal } from './AddPlayerModal.tsx';
@@ -17,12 +17,25 @@ interface PlayersViewProps {
     currentUserName: string | null;
 }
 
+// --- New types for courses and course-handicap responses ---
+interface Course { id: number; name: string; }
+interface CourseHandicapResponse { handicap: number; }
+
 export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     // 1. STATE MANAGEMENT
     const [players, setPlayers] = useState<Player[]>([]);
     const [teams, setTeams] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // New state: list of courses and per-player selected course
+    const [courses, setCourses] = useState<Course[]>([]);
+    const [selectedCourseByPlayer, setSelectedCourseByPlayer] = useState<Record<number, number | "">>({});
+
+    // Cache for fetched course handicaps keyed by `${playerId}_${courseId}`
+    const courseHandicapCacheRef = useRef<Map<string, number>>(new Map());
+    const [loadingCourseKeys, setLoadingCourseKeys] = useState<Record<string, boolean>>({});
+    const [, forceRerender] = useState(0); // used to re-render after mutating ref
 
     // Modal States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -34,12 +47,14 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [playerRes, teamRes] = await Promise.all([
+            const [playerRes, teamRes, courseRes] = await Promise.all([
                 api.get('/players'),
-                api.get('/teams')
+                api.get('/teams'),
+                api.get('/courses')
             ]);
             setPlayers(Array.isArray(playerRes.data) ? playerRes.data : []);
             setTeams(Array.isArray(teamRes.data) ? teamRes.data : []);
+            setCourses(Array.isArray(courseRes.data) ? courseRes.data : []);
         } catch (err) {
             console.error("Error fetching data:", err);
         } finally {
@@ -50,6 +65,68 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // --- New: select a course for a player and fetch course-handicap if needed ---
+    const onSelectCourse = async (playerId: number, courseId: number) => {
+        setSelectedCourseByPlayer(prev => ({ ...prev, [playerId]: courseId }));
+        const key = `${playerId}_${courseId}`;
+
+        if (courseHandicapCacheRef.current.has(key)) {
+            forceRerender(n => n + 1);
+            return;
+        }
+
+        // mark loading for this key
+        setLoadingCourseKeys(prev => ({ ...prev, [key]: true }));
+        try {
+            const res = await api.get<CourseHandicapResponse>(`/players/${playerId}/${courseId}/handicap`);
+            // Controller returns CourseHandicap entity; we read `handicap` from it
+            const handicap = res.data && (res.data as any).handicap !== undefined ? (res.data as any).handicap : undefined;
+            if (handicap !== undefined) {
+                courseHandicapCacheRef.current.set(key, handicap);
+            }
+        } catch (err) {
+            console.error('Failed to load player course handicap', err);
+        } finally {
+            setLoadingCourseKeys(prev => {
+                const next = { ...prev } as Record<string, boolean>;
+                delete next[key];
+                return next;
+            });
+            forceRerender(n => n + 1);
+        }
+    };
+
+    // --- New: admin can update course handicap for a player ---
+    const handleUpdateCourseHandicap = async (playerId: number, courseId: number) => {
+        const input = window.prompt('New course handicap (e.g. 12.3):');
+        if (input === null) return; // cancelled
+        const parsed = parseFloat(input);
+        if (isNaN(parsed)) {
+            alert('Enter a valid number');
+            return;
+        }
+
+        try {
+            // Controller expects a raw double in the request body
+            await api.post(
+                `/players/${playerId}/${courseId}/handicap`,
+                parsed,
+
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+            const key = `${playerId}_${courseId}`;
+            courseHandicapCacheRef.current.set(key, parsed);
+            forceRerender(n => n + 1);
+        } catch (err) {
+            console.error('Failed to update course handicap', err);
+            alert('Failed to update handicap.');
+        }
+    };
 
     // 3. ACTION HANDLERS
     const handleUpdateHandicap = async (name: string, current: number) => {
@@ -142,13 +219,14 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                     <tr>
                         <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext">Golfer</th>
                         <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext">Handicap</th>
+                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext">Course Handicap</th>
                         <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext">Team Status</th>
                         <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-latte-subtext text-center">Actions</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-latte-crust">
                     {filteredPlayers.map(p => (
-                        <tr key={p.name} className="hover:bg-latte-base/30 transition-colors">
+                        <tr key={p.id} className="hover:bg-latte-base/30 transition-colors">
                             <td className="px-8 py-5 font-bold text-latte-text">
                                 <div className="flex items-center gap-3">
                                     <User size={16} className="text-latte-subtext" />
@@ -178,6 +256,47 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                                             <Edit2 size={14} />
                                         </button>
                                     )}
+                                </div>
+                            </td>
+
+                            {/* New: Course Handicap dropdown & display */}
+                            <td className="px-8 py-5">
+                                <div className="flex items-center gap-3">
+                                    <select
+                                        className="bg-transparent border-b border-latte-crust text-sm font-medium outline-none focus:border-latte-green cursor-pointer"
+                                        value={selectedCourseByPlayer[p.id] ?? ""}
+                                        onChange={(e) => onSelectCourse(p.id, Number(e.target.value))}
+                                    >
+                                        <option value="">Select Course</option>
+                                        {courses.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* show handicap or loading */}
+                                    {(() => {
+                                        const sel = selectedCourseByPlayer[p.id];
+                                        if (!sel) return <span className="text-latte-subtext">—</span>;
+                                        const key = `${p.id}_${sel}`;
+                                        if (loadingCourseKeys[key]) return <span className="text-latte-subtext">Loading...</span>;
+                                        const cached = courseHandicapCacheRef.current.get(key);
+                                        return cached !== undefined ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="bg-latte-base px-3 py-1 rounded-lg font-mono font-bold text-latte-blue">{cached}</span>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => handleUpdateCourseHandicap(p.id, Number(sel))}
+                                                        className="text-latte-subtext hover:text-latte-blue transition-colors"
+                                                        title="Edit Course Handicap"
+                                                    >
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-latte-subtext">—</span>
+                                        );
+                                    })()}
                                 </div>
                             </td>
 
@@ -249,3 +368,4 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
         </div>
     );
 };
+

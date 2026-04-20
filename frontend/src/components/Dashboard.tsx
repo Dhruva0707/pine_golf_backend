@@ -16,7 +16,8 @@ interface DecodedToken {
 
 export const Dashboard = () => {
     // 1. STATE: This is the "brain" of the component.
-    const [activeTab, setActiveTab] = useState('players');
+    // default to the ScoreCards (Flights) view when arriving from login
+    const [activeTab, setActiveTab] = useState('scoreCards');
     const [isAdmin, setIsAdmin] = useState(false);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
@@ -60,14 +61,24 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Tab Switchers */}
-                <nav className="flex items-center bg-latte-mantle p-1 rounded-xl border border-latte-crust overflow-x-auto no-scrollbar whitespace-nowrap max-w-full gap-1">
+                <button
+                    onClick={logout}
+                    className="flex items-center gap-2 text-latte-red font-bold text-sm hover:bg-latte-red/10 px-4 py-2 rounded-xl transition-all"
+                >
+                    <LogOut size={18} /> Logout
+                </button>
+            </header>
+
+            {/* Tab Switchers - moved below the main header so it's on its own row */}
+            {/* Center the tabs within their row and align with main content padding */}
+            <div className="max-w-7xl mx-auto w-full px-6 md:px-10">
+                <nav className="mt-4 flex items-center justify-start bg-latte-mantle p-1 rounded-xl border border-latte-crust overflow-x-auto no-scrollbar whitespace-nowrap max-w-full gap-1">
                     {[
                         { id: 'seasons', label: 'Seasons', icon: <Calendar size={16}/> },
                         { id: 'teams', label: 'Teams', icon: <LayoutDashboard size={16}/> },
                         { id: 'players', label: 'Players', icon: <Users size={16}/> },
                         { id: 'courses', label: 'Courses', icon: <Map size={16}/> },
-                        { id: 'flights', label: 'Flights', icon: <Send size={16}/> }
+                        { id: 'scoreCards', label: 'ScoreCards', icon: <Send size={16}/> }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -82,14 +93,7 @@ export const Dashboard = () => {
                         </button>
                     ))}
                 </nav>
-
-                <button
-                    onClick={logout}
-                    className="flex items-center gap-2 text-latte-red font-bold text-sm hover:bg-latte-red/10 px-4 py-2 rounded-xl transition-all"
-                >
-                    <LogOut size={18} /> Logout
-                </button>
-            </header>
+             </div>
 
             {/* --- CONTENT AREA --- */}
             <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full">
@@ -98,9 +102,9 @@ export const Dashboard = () => {
                 {activeTab === 'teams' && <TeamsView isAdmin={isAdmin} />}
                 {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
                 {activeTab === 'courses' && <CourseManager isAdmin={isAdmin} />}
-
-                {activeTab === 'flights' && <FlightsView />}
+                {activeTab === 'scoreCards' && <FlightsView />}
             </main>
         </div>
     );
 };
+

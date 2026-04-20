@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { Send, History, Plus, Calendar, Target, User, Search, X, Trash2 } from 'lucide-react';
+import {Send, History, Plus, Calendar, User, Search, X, Trash2} from 'lucide-react';
 import api from '../../api/client';
 
 interface FlightScoreDTO {
@@ -18,6 +18,7 @@ interface FlightDTO {
 }
 
 interface PlayerDTO {
+    id?: number;
     name: string;
     team?: string;
     handicap: number;
@@ -35,7 +36,8 @@ export const FlightsView = () => {
 
     // Form State for New Flight (support multiple players like AddFlightModal)
     const [courseName, setCourseName] = useState('');
-    const [flightRows, setFlightRows] = useState<{ player: PlayerDTO; scores: number[] }[]>([]);
+    // Each row now holds expected and actual values separately. Actual uses null for un-entered values.
+    const [flightRows, setFlightRows] = useState<{ player: PlayerDTO; expected: number[]; actual: (number | null)[] }[]>([]);
     const [selectedPlayerToAdd, setSelectedPlayerToAdd] = useState('');
 
     // Fetch Logic
@@ -66,6 +68,7 @@ export const FlightsView = () => {
         const name = p?.name ?? p?.username ?? p?.displayName;
         if (!name) return null;
         return {
+            id: p?.id ?? p?.playerId,
             name,
             team: p?.team,
             handicap: Number(p.handicap)
@@ -102,12 +105,12 @@ export const FlightsView = () => {
 
     const getExpectedScoresForPlayer = async (player: PlayerDTO | undefined, courseName: string) => {
         const course = courses.find((c: any) => c?.name === courseName);
-        const courseId = course?.id ?? course?.courseId;
-        const handicap = Number(player?.handicap);
+        const courseId = course?.id;
+        const playerId = player?.id;
 
-        if (courseId !== undefined && !Number.isNaN(handicap)) {
+        if (courseId !== undefined && playerId !== undefined) {
             try {
-                const res = await api.get(`/flights/${courseId}/${handicap}`);
+                const res = await api.get(`/flights/${courseId}/${playerId}`);
                 if (Array.isArray(res.data) && res.data.length > 0) return res.data.map((v: any) => Number(v) || 0);
             } catch (err) {
                 console.error('Failed to fetch expected scores for player', err);
@@ -165,11 +168,12 @@ export const FlightsView = () => {
         if (flightRows.length === 0) return alert("Please add at least one player to this flight.");
 
         const payload: FlightScoreDTO[] = flightRows.map(r => {
-            const totalScore = r.scores.reduce((a, b) => a + (Number(b) || 0), 0);
+            const holeScores = r.actual.map((a, idx) => (a !== null && !isNaN(a as number) ? (a as number) : r.expected[idx]));
+            const totalScore = holeScores.reduce((a, b) => a + (Number(b) || 0), 0);
             return {
                 playerName: r.player.name,
                 courseName,
-                holeScores: r.scores,
+                holeScores,
                 score: totalScore,
                 birdies: 0
             } as FlightScoreDTO;
@@ -193,7 +197,8 @@ export const FlightsView = () => {
                 const current = players.find(p => p.name === currentUserName);
                 if (current) {
                     void (async () => {
-                        setFlightRows([{ player: current, scores: await getExpectedScoresForPlayer(current, courseName) }]);
+                        const expected = await getExpectedScoresForPlayer(current, courseName);
+                        setFlightRows([{ player: current, expected, actual: Array(18).fill(null) }]);
                     })();
                 }
             }
@@ -206,7 +211,8 @@ export const FlightsView = () => {
             const current = players.find(p => p.name === currentUserName);
             if (current) {
                 void (async () => {
-                    setFlightRows([{ player: current, scores: await getExpectedScoresForPlayer(current, courseName) }]);
+                    const expected = await getExpectedScoresForPlayer(current, courseName);
+                    setFlightRows([{ player: current, expected, actual: Array(18).fill(null) }]);
                 })();
             }
         }
@@ -218,8 +224,8 @@ export const FlightsView = () => {
         if (flightRows.some(r => r.player.name === name)) return;
         const player = players.find(p => p.name === name);
         if (!player) return;
-        const scores = await getExpectedScoresForPlayer(player, courseName);
-        setFlightRows(prev => [...prev, { player, scores }]);
+        const expected = await getExpectedScoresForPlayer(player, courseName);
+        setFlightRows(prev => [...prev, { player, expected, actual: Array(18).fill(null) }]);
         setSelectedPlayerToAdd('');
     };
     const removePlayerFromFlight = (index: number) => {
@@ -250,7 +256,7 @@ export const FlightsView = () => {
                                 : 'bg-latte-green text-white hover:opacity-90'
                         }`}
                     >
-                        {view === 'history' ? <><Plus size={18}/> Add Flight</> : <><History size={18}/> View History</>}
+                        {view === 'history' ? <><Plus size={18}/> Add Score</> : <><History size={18}/> View History</>}
                     </button>
                 </div>
             </div>
@@ -324,7 +330,7 @@ export const FlightsView = () => {
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="bg-white p-2 rounded-lg shadow-sm text-latte-mauve">
-                                                <Target size={16} />
+                                                <Send size={16} />
                                             </div>
                                             <span className="font-black text-latte-text">{course}</span>
                                         </div>
@@ -383,11 +389,17 @@ export const FlightsView = () => {
                                 onChange={async (e) => {
                                     const nextCourse = e.target.value;
                                     setCourseName(nextCourse);
+                                    // update expected arrays for each row while preserving any entered actuals
                                     const updated = await Promise.all(
-                                        flightRows.map(async row => ({
-                                            ...row,
-                                            scores: await getExpectedScoresForPlayer(row.player, nextCourse)
-                                        }))
+                                        flightRows.map(async row => {
+                                            const expected = await getExpectedScoresForPlayer(row.player, nextCourse);
+                                            return {
+                                                ...row,
+                                                expected,
+                                                // keep actual if present, otherwise keep nulls
+                                                actual: row.actual && row.actual.length === 18 ? row.actual : Array(18).fill(null)
+                                            };
+                                        })
                                     );
                                     setFlightRows(updated);
                                 }}
@@ -429,6 +441,27 @@ export const FlightsView = () => {
                                 </tr>
                             </thead>
                             <tbody>
+                                {/* Par row - visually emphasized */}
+                                <tr className="border-b bg-latte-base border-latte-crust">
+                                    <td className="p-2 text-center"></td>
+                                    <td className="p-2 font-black">Par</td>
+                                    {(() => {
+                                        const course = courses.find((c: any) => c?.name === courseName);
+                                        const pars = (course && Array.isArray(course.pars)) ? course.pars : Array.from({ length: 18 }).map(() => 3);
+                                        return pars.map((p: number, i: number) => (
+                                            <td key={i} className="p-0.5 text-center">
+                                                <div className="text-sm font-black">{p}</div>
+                                            </td>
+                                        ));
+                                    })()}
+                                    <td className="p-2 text-right font-black">{(() => {
+                                        const course = courses.find((c: any) => c?.name === courseName);
+                                        const pars = (course && Array.isArray(course.pars)) ? course.pars : Array.from({ length: 18 }).map(() => 3);
+                                        return pars.reduce((a: number, b: number) => a + (Number(b) || 0), 0);
+                                    })()}</td>
+                                </tr>
+
+                                {/* Player Actual rows only (show '-' for empty inputs) */}
                                 {flightRows.map((row, rowIndex) => (
                                     <tr key={rowIndex} className="border-b border-latte-mantle hover:bg-white/30 transition-colors">
                                         <td className="p-2 text-center">
@@ -437,22 +470,25 @@ export const FlightsView = () => {
                                             </button>
                                         </td>
                                         <td className="p-2 font-bold text-sm whitespace-nowrap">{row.player.name}</td>
-                                        {row.scores.map((score, holeIndex) => (
+                                        {row.actual.map((val, holeIndex) => (
                                             <td key={holeIndex} className="p-0.5">
                                                 <input
                                                     type="number"
+                                                    placeholder="-"
                                                     className="w-full min-w-[32px] text-center p-1 rounded-md border border-transparent hover:border-latte-crust text-xs font-bold focus:border-latte-mauve focus:bg-white outline-none bg-transparent"
-                                                    value={score || ''}
+                                                    value={val !== null && val !== undefined ? String(val) : ''}
                                                     onChange={(e) => {
                                                         const next = [...flightRows];
-                                                        next[rowIndex].scores[holeIndex] = parseInt(e.target.value) || 0;
+                                                        const parsed = e.target.value === '' ? null : parseInt(e.target.value);
+                                                        next[rowIndex] = { ...next[rowIndex], actual: [...next[rowIndex].actual] };
+                                                        next[rowIndex].actual[holeIndex] = parsed;
                                                         setFlightRows(next);
                                                     }}
                                                 />
                                             </td>
                                         ))}
                                         <td className="p-2 text-right font-black text-latte-mauve">
-                                            {row.scores.reduce((a, b) => a + (Number(b) || 0), 0)}
+                                            {row.actual.map((a, i) => (a !== null && a !== undefined ? Number(a) : Number(row.expected[i] || 0))).reduce((a, b) => a + (Number(b) || 0), 0)}
                                         </td>
                                     </tr>
                                 ))}

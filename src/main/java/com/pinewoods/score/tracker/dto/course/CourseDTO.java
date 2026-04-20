@@ -14,4 +14,7 @@ public class CourseDTO {
     private String name;
     private List<Integer> pars;
     private List<Integer> indexes;
+
+    private double slopeRating;
+    private double courseRating;
 }

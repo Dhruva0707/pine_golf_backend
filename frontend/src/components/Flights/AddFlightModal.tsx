@@ -11,7 +11,8 @@ export interface FlightManagerModalProps {
 export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManagerModalProps) => {
     // --- State ---
     const [players, setPlayers] = useState<any[]>([]);
-    const [flightRows, setFlightRows] = useState<{player: any, scores: number[]}[]>([]);
+    // flightRows now holds expected and actual arrays; actual uses null for un-entered values
+    const [flightRows, setFlightRows] = useState<{ player: any; expected: number[]; actual: (number | null)[] }[]>([]);
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [isFinished, setIsFinished] = useState(false);
 
@@ -23,10 +24,12 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     const getDefaultScoresForPlayer = async (player: any) => {
         const tournamentId = tournament?.id;
         const handicap = player.handicap;
-        console.log("fetching handicap scores for ", player.name, " (", tournamentId, ", ", handicap, ")")
+        const multiplier = tournament?.handicapMultiplier ?? 1.0; // use tournament multiplier if present
+        console.log("fetching handicap scores for ", player.name, " (", tournamentId, ", ", handicap, ") with multiplier", multiplier)
         if (tournamentId !== undefined && handicap !== undefined) {
             try {
-                const res = await api.get(`/tournaments/${tournamentId}/${handicap}/handicapScore`);
+                // Backend endpoint that supports handicapMultiplier
+                const res = await api.get(`/tournaments/${tournamentId}/${handicap}/handicapScore?multiplier=${multiplier}`);
                 if (Array.isArray(res.data) && res.data.length > 0) {
                     return res.data.map((v: any, i: number) => Number(v) || getLocalDefaultScores()[i] || 3);
                 }
@@ -63,8 +66,8 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
         if (!playerName) return;
         const playerObj = players.find(p => p.name === playerName);
         if (playerObj) {
-            const scores = await getDefaultScoresForPlayer(playerObj);
-            setFlightRows(prev => [...prev, { player: playerObj, scores }]);
+            const expected = await getDefaultScoresForPlayer(playerObj);
+            setFlightRows(prev => [...prev, { player: playerObj, expected, actual: Array(18).fill(null) }]);
             setSelectedPlayerId('');
         }
     };
@@ -76,9 +79,10 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
     const handleAddFlight = async () => {
         if (flightRows.length === 0) return;
 
+        // Build payload: fill missing actuals with expected
         const payload = flightRows.map(row => ({
             player: row.player,
-            holeScores: row.scores
+            holeScores: row.actual.map((a, idx) => (a !== null && a !== undefined ? a : row.expected[idx]))
         }));
 
         try {
@@ -128,37 +132,55 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
                                             </tr>
                                             </thead>
                                             <tbody>
+                                            {/* Par row - emphasized */}
+                                            <tr className="border-b border-latte-mauve bg-latte-mauve/10">
+                                                <td className="p-2 text-center"></td>
+                                                <td className="p-2 font-black text-latte-mauve">Par</td>
+                                                {(() => {
+                                                    const pars = tournament?.course?.pars ?? tournament?.pars ?? Array.from({ length: 18 }).map(() => 3);
+                                                    return pars.map((p: number, i: number) => (
+                                                        <td key={i} className="p-0.5 text-center"><div className="text-sm font-black text-latte-mauve">{p}</div></td>
+                                                    ));
+                                                })()}
+                                                <td className="p-2 text-right font-black text-latte-mauve">{(() => {
+                                                    const pars = tournament?.course?.pars ?? tournament?.pars ?? Array.from({ length: 18 }).map(() => 3);
+                                                    return pars.reduce((a: number, b: number) => a + (Number(b) || 0), 0);
+                                                })()}</td>
+                                            </tr>
+
+                                            {/* Player Actual rows only */}
                                             {flightRows.map((row, rowIndex) => (
-                                                <tr key={rowIndex} className="border-b border-latte-mantle hover:bg-latte-base/10 transition-colors">
+                                                <tr key={rowIndex} className="border-b border-latte-mantle hover:bg-white/30 transition-colors">
                                                     <td className="p-2 text-center">
                                                         <button onClick={() => removePlayerFromFlight(rowIndex)} className="text-latte-subtext hover:text-latte-red">
                                                             <Trash2 size={14} />
                                                         </button>
                                                     </td>
                                                     <td className="p-2 font-bold text-sm whitespace-nowrap">{row.player.name}</td>
-                                                    {row.scores.map((score, holeIndex) => (
+                                                    {row.actual.map((val, holeIndex) => (
                                                         <td key={holeIndex} className="p-0.5">
                                                             <input
                                                                 type="number"
+                                                                placeholder="-"
                                                                 className="w-full min-w-[32px] text-center p-1 rounded-md border border-transparent hover:border-latte-crust text-xs font-bold focus:border-latte-mauve focus:bg-white outline-none bg-transparent"
-                                                                value={score || ''}
+                                                                value={val !== null && val !== undefined ? String(val) : ''}
                                                                 onChange={(e) => {
-                                                                    const newRows = [...flightRows];
-                                                                    newRows[rowIndex].scores[holeIndex] = parseInt(e.target.value) || 0;
-                                                                    setFlightRows(newRows);
+                                                                    const next = [...flightRows];
+                                                                    const parsed = e.target.value === '' ? null : parseInt(e.target.value);
+                                                                    next[rowIndex] = { ...next[rowIndex], actual: [...next[rowIndex].actual] };
+                                                                    next[rowIndex].actual[holeIndex] = parsed;
+                                                                    setFlightRows(next);
                                                                 }}
                                                             />
                                                         </td>
                                                     ))}
-                                                    <td className="p-2 text-right font-black text-latte-mauve">
-                                                        {row.scores.reduce((a, b) => a + b, 0)}
-                                                    </td>
+                                                    <td className="p-2 text-right font-black text-latte-mauve">{row.actual.map((a, i) => (a !== null && a !== undefined ? Number(a) : Number(row.expected[i] || 0))).reduce((a, b) => a + (Number(b) || 0), 0)}</td>
                                                 </tr>
                                             ))}
-                                            </tbody>
-                                        </table>
+                                             </tbody>
+                                         </table>
 
-                                        <div className="mt-4 p-1 bg-latte-mantle/50 rounded-xl border border-dashed border-latte-subtext/20">
+                                         <div className="mt-4 p-1 bg-latte-mantle/50 rounded-xl border border-dashed border-latte-subtext/20">
                                             <select
                                                 className="w-full bg-transparent font-bold outline-none text-xs p-3 cursor-pointer text-latte-subtext"
                                                 value={selectedPlayerId}
@@ -170,18 +192,18 @@ export const FlightManagerModal = ({ isOpen, onClose, tournament }: FlightManage
                                                     .map(p => <option key={p.name} value={p.name}>{p.name}</option>)
                                                 }
                                             </select>
-                                        </div>
-                                    </div>
+                                         </div>
+                                     </div>
 
-                                    <button
-                                        onClick={handleAddFlight}
-                                        disabled={flightRows.length === 0}
-                                        className="w-full py-4 bg-latte-mauve text-white rounded-2xl font-black shadow-lg hover:brightness-110 transition-all disabled:opacity-50 uppercase tracking-widest text-sm"
-                                    >
-                                        Submit Flight
-                                    </button>
-                                </>
-                            ) : (
+                                     <button
+                                         onClick={handleAddFlight}
+                                         disabled={flightRows.length === 0}
+                                         className="w-full py-4 bg-latte-mauve text-white rounded-2xl font-black shadow-lg hover:brightness-110 transition-all disabled:opacity-50 uppercase tracking-widest text-sm"
+                                     >
+                                         Submit Flight
+                                     </button>
+                                 </>
+                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-center p-10">
                                     <Award size={60} className="text-latte-yellow mb-4" />
                                     <h3 className="text-xl font-black">Tournament Finalized</h3>
