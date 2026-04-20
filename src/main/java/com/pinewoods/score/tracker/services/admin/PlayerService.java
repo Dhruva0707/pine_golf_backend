@@ -79,7 +79,7 @@ public class PlayerService {
 
         playerRepository.save(player);
 
-        return createPlayerDTO(player);
+        return player.toDTO();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -115,13 +115,13 @@ public class PlayerService {
         boolean isAdmin = isUserAdmin();
         return playerRepository.findAll().stream()
                 .filter(player -> isAdmin || player.getRole() != Role.ADMIN)
-                .map(PlayerService::createPlayerDTO)
+                .map(Player::toDTO)
                 .toList();
     }
 
     public PlayerDTO getPlayerById(Long id) {
         return playerRepository.findById(id)
-                .map(PlayerService::createPlayerDTO)
+                .map(Player::toDTO)
                 .orElseThrow(() -> new ResourceNotFoundException("Player with id " + id + " does not exist."));
     }
 
@@ -168,7 +168,7 @@ public class PlayerService {
             player.setTeam(team);
         }
 
-        return createPlayerDTO(playerRepository.save(player));
+        return playerRepository.save(player).toDTO();
     }
 
     @Transactional
@@ -178,7 +178,7 @@ public class PlayerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Player not found"));
 
         player.setPassword(passwordEncoder.encode(newPassword));
-        return createPlayerDTO(playerRepository.save(player));
+        return playerRepository.save(player).toDTO();
     }
 
     // ----------- Delete Player -----------
@@ -198,15 +198,4 @@ public class PlayerService {
         playerRepository.delete(player);
     }
 
-    // ----------- Helper Methods -----------
-
-    /**
-     * A helper method that converts a Player entity to a PlayerDTO.
-     *
-     * @param player the Player entity to convert
-     * @return PlayerDTO representing the player
-     */
-    public static PlayerDTO createPlayerDTO(Player player) {
-        return new PlayerDTO(player.getName(), player.getTeam().getName(), player.getHandicap());
-    }
 }

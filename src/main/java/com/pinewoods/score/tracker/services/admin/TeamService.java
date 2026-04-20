@@ -3,6 +3,7 @@ package com.pinewoods.score.tracker.services.admin;
 import com.pinewoods.score.tracker.dao.admin.TeamRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.admin.TeamDTO;
+import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.admin.Team;
 import com.pinewoods.score.tracker.exceptions.ResourceConflictException;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
@@ -123,7 +124,7 @@ public class TeamService {
         List<PlayerDTO> playerDTOs = new ArrayList<>();
 
         if (playersList != null && !playersList.isEmpty()) {
-            playerDTOs = playersList.stream().map(PlayerService::createPlayerDTO).toList();
+            playerDTOs = playersList.stream().map(Player::toDTO).toList();
         }
 
         return new TeamDTO(team.getName(), playerDTOs);

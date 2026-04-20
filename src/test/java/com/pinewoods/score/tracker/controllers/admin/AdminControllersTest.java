@@ -9,7 +9,8 @@ import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
 import com.pinewoods.score.tracker.entities.admin.Role;
 import com.pinewoods.score.tracker.entities.admin.Team;
-import com.pinewoods.score.tracker.services.admin.PlayerService;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -116,7 +117,7 @@ class AdminControllersTest {
                             "team": "Team1"
                         }
                         """,
-                        new PlayerDTO("newPlayer", "Team1", 10.0),
+                        new PlayerDTO("newPlayer", "Team1", 10.0, 0L),
                         HttpStatus.CREATED,
                         true
                 ),
@@ -132,7 +133,7 @@ class AdminControllersTest {
                                 "role": "USER"
                             }
                         """,
-                        new PlayerDTO("newPlayer", "UNASSIGNED", 10.0),
+                        new PlayerDTO("newPlayer", "UNASSIGNED", 10.0, 0L),
                         HttpStatus.CREATED,
                         true
                 ),
@@ -205,14 +206,20 @@ class AdminControllersTest {
                 expectedStatus + ". " + "got " + response.getStatusCode() + " instead.");
 
         if (expectedStatus == HttpStatus.CREATED) {
-            String expectedString = objectMapper.writeValueAsString(expected);
+            //create the expected response based on the response body
+            Long expectedId = getPlayerByName(((PlayerDTO) expected).name()).getId();
+            PlayerDTO expectedDTO = new PlayerDTO(((PlayerDTO) expected).name(),
+                ((PlayerDTO) expected).team(),
+                ((PlayerDTO) expected).handicap(),
+                expectedId);
+            String expectedString = objectMapper.writeValueAsString(expectedDTO);
             assertEquals(expectedString, response.getBody(),
                     "The created player should match the expected values.");
 
             if (checkPersistence) {
                 Player player = getPlayerByName("newPlayer");
-                PlayerDTO playerDTO = PlayerService.createPlayerDTO(player);
-                assertEquals(expected, playerDTO,
+                PlayerDTO playerDTO = player.toDTO();
+                assertEquals(expectedDTO, playerDTO,
                         "The persisted player should match the expected values.");
             }
         }
@@ -221,9 +228,9 @@ class AdminControllersTest {
     // ------------------- Read tests --------------------
 
     private static Stream<Arguments> provideReadParameters() {
-        PlayerDTO player1 = new PlayerDTO("player1", "Team1", 15.0);
-        PlayerDTO player2 = new PlayerDTO("player2", "Team2", 15.3);
-        PlayerDTO admin = new PlayerDTO("test_admin", "UNASSIGNED", 0.0);
+        PlayerDTO player1 = new PlayerDTO("player1", "Team1", 15.0, 0L);
+        PlayerDTO player2 = new PlayerDTO("player2", "Team2", 15.3, 0L);
+        PlayerDTO admin = new PlayerDTO("test_admin", "UNASSIGNED", 0.0, 0L);
         return Stream.of(
                 Arguments.of(
                         player1Username, player1Password,
@@ -278,7 +285,25 @@ class AdminControllersTest {
                 expectedStatus + ". " + "got " + response.getStatusCode() + " instead.");
 
         if (expectedStatus == HttpStatus.OK) {
-            String expectedString = objectMapper.writeValueAsString(expected);
+            Object expectedObject = null;
+            if (expected instanceof  PlayerDTO[]) {
+                List<PlayerDTO> expectedPlayers = new ArrayList<PlayerDTO>();
+                for (PlayerDTO player : (PlayerDTO[]) expected) {
+                    Long expectedId = getPlayerByName(player.name()).getId();
+                    PlayerDTO expectedPlayer = new PlayerDTO(player.name(), player.team(), player.handicap(), expectedId);
+                    expectedPlayers.add(expectedPlayer);
+                    expectedObject = expectedPlayers.toArray();
+                }
+            }
+
+            if (expected instanceof PlayerDTO) {
+                Long expectedId = getPlayerByName(((PlayerDTO) expected).name()).getId();
+                expectedObject = new PlayerDTO(((PlayerDTO) expected).name(),
+                        ((PlayerDTO) expected).team(),
+                        ((PlayerDTO) expected).handicap(),
+                        expectedId);
+            }
+            String expectedString = objectMapper.writeValueAsString(expectedObject);
             assertEquals(expectedString, response.getBody(),
                     "The returned players should match the expected values.");
         }
