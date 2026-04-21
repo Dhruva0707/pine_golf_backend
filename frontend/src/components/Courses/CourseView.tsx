@@ -90,9 +90,6 @@ export const CourseManager = ({ isAdmin }: CourseManagerProps) => {
                                             <span className="text-[10px] font-black uppercase text-latte-subtext bg-latte-base px-2 py-0.5 rounded">
                                                 Par {course.pars.reduce((a: number, b: number) => a + b, 0)}
                                             </span>
-                                            <span className="text-[10px] font-black uppercase text-latte-subtext bg-latte-base px-2 py-0.5 rounded">
-                                                18 Holes
-                                            </span>
                                         </div>
                                     </div>
                                 </div>
