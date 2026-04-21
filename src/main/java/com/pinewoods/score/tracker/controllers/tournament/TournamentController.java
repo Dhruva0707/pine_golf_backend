@@ -9,6 +9,7 @@ import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
+import com.pinewoods.score.tracker.services.course.CourseService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import com.pinewoods.score.tracker.services.scoring.ScoringStrategyFactory;
 import com.pinewoods.score.tracker.services.tournament.TournamentService;
@@ -45,6 +46,8 @@ public class TournamentController {
     private final PlayerRepository playerRepository;
     private final CourseRepository courseRepository;
 
+    private final CourseService courseService;
+
     @PostMapping("/start")
     @Operation(summary = "Create and start a new tournament session",
             description = "Initializes the scoring strategy and parks it in memory until the tournament is finalized.")
@@ -59,12 +62,11 @@ public class TournamentController {
         // Build the strategy instance from request data
         IScoringStrategy strategy = strategyFactory.getStrategy(
                 request.getStrategyType(),
-                course.getPars(),
-                course.getIndexes(),
+                course,
                 request.getPointsMap(),
                 request.getHandicapMultiplier(),
-                request.getCourseName(),
-                playerRepository
+                playerRepository,
+                courseService
         );
 
         Tournament tournament = tournamentService.createTournament(
@@ -99,6 +101,12 @@ public class TournamentController {
     public ResponseEntity<TournamentDTO> getTournament(@PathVariable("tournamentName") String tournamentName,
                                                        @PathVariable("seasonName") String seasonName) {
         return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
+    }
+
+    @GetMapping("")
+    @Operation(summary = "Get all active tournaments")
+    public ResponseEntity<List<TournamentDTO>> getAllActiveTournaments() {
+        return ResponseEntity.ok(tournamentService.getAllActiveTournaments());
     }
 
     @GetMapping("/{seasonName}/{tournamentName}/leaderBoard")

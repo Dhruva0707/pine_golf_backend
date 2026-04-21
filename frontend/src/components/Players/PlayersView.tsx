@@ -268,8 +268,8 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                                         onChange={(e) => onSelectCourse(p.id, Number(e.target.value))}
                                     >
                                         <option value="">Select Course</option>
-                                        {courses.map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        {courses.map((c, idx) => (
+                                            <option key={c.id ?? `course-${idx}`} value={c.id}>{c.name}</option>
                                         ))}
                                     </select>
 
@@ -308,8 +308,8 @@ export const PlayersView = ({ isAdmin, currentUserName }: PlayersViewProps) => {
                                         onChange={(e) => handleUpdateTeam(p.name, e.target.value)}
                                     >
                                         <option value="">Independent</option>
-                                        {teams.map(t => (
-                                            <option key={t.id} value={t.name}>{t.name}</option>
+                                        {teams.map((t, idx) => (
+                                            <option key={t.id ?? `team-${idx}`} value={t.name}>{t.name}</option>
                                         ))}
                                     </select>
                                 ) : (

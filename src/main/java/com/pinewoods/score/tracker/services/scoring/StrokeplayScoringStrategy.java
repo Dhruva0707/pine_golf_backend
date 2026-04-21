@@ -2,9 +2,12 @@ package com.pinewoods.score.tracker.services.scoring;
 
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
+import com.pinewoods.score.tracker.entities.admin.Player;
+import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
 
+import com.pinewoods.score.tracker.services.course.CourseService;
 import java.util.Date;
 import java.util.List;
 
@@ -13,18 +16,15 @@ public class StrokeplayScoringStrategy extends BaseScoringStrategy {
     PlayerRepository playerRepo;
     final int totalPar;
 
-    public StrokeplayScoringStrategy(List<Integer> pars, String courseName, PlayerRepository playerRepo,
-                                     double handicapMultiplier) {
+    public StrokeplayScoringStrategy(
+        Course course, PlayerRepository playerRepo,
+                                     double handicapMultiplier, CourseService courseService) {
         super(handicapMultiplier);
 
-        if (pars.size() != 18 || indexes.size() != 18) {
-            throw new IllegalArgumentException("Pars and indexes must be of length 18");
-        }
-
-        this.pars = pars;
-        this.courseName = courseName;
+        this.course = course;
         this.playerRepo = playerRepo;
-        totalPar = pars.stream().mapToInt(Integer::intValue).sum();
+        totalPar = course.getPars().stream().mapToInt(Integer::intValue).sum();
+        this.courseService = courseService;
     }
 
     @Override
@@ -34,14 +34,15 @@ public class StrokeplayScoringStrategy extends BaseScoringStrategy {
                 .build();
 
         for (FlightScore card : originalFlight.getFlightScores()) {
-            PlayerDTO player = card.getPlayer().toDTO();
-            int handicap = (int) Math.round(player.handicap() * handicapMultiplier);
+            Player player = card.getPlayer();
+            PlayerDTO playerDto = player.toDTO();
+            int handicap = (int) Math.round(getCourseHandicap(player.getId(), course.getId()) * handicapMultiplier);
             int totalScore = card.getHoleScores().stream().mapToInt(Integer::intValue).sum();
             int birdies = countBirdies(card.getHoleScores());
             int totalPoints = totalPar + handicap - totalScore;
 
             FlightScore fs = FlightScore.builder()
-                    .player(playerRepo.findByName(player.name()).orElseThrow())
+                    .player(playerRepo.findByName(playerDto.name()).orElseThrow())
                     .score(totalPoints)
                     .birdies(birdies)
                     .flight(calculatedFlight)

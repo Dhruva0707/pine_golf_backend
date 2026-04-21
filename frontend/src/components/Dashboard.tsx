@@ -24,16 +24,42 @@ export const Dashboard = () => {
     // 2. EFFECT: This runs once when the page loads.
     useEffect(() => {
         const token = localStorage.getItem('golf_token');
-        if (token) {
-            try {
-                const decoded = jwtDecode<DecodedToken>(token);
-                // Check if the user has the 'ROLE_ADMIN' authority
-                const hasAdminRole = decoded.roles?.some(r => r.authority === 'ROLE_ADMIN') ?? false;
-                setIsAdmin(hasAdminRole);
-                setCurrentUserName(decoded.sub);
-            } catch (e) {
-                console.error("Token decoding failed", e);
-            }
+        if (!token) return;
+
+        try {
+            const decoded: any = jwtDecode(token);
+
+            // Normalize many possible claim shapes to detect admin role
+            const containsAdmin = () => {
+                // 1) roles: [{authority: 'ROLE_ADMIN'}]
+                const rolesObj = decoded?.roles;
+                if (Array.isArray(rolesObj) && rolesObj.some((r: any) => (r?.authority || '').toUpperCase().includes('ADMIN'))) return true;
+
+                // 2) authorities: ['ROLE_ADMIN'] or [{authority: 'ROLE_ADMIN'}]
+                const auth = decoded?.authorities || decoded?.Authorities || decoded?.authority;
+                if (Array.isArray(auth)) {
+                    if (auth.some((a: any) => (typeof a === 'string' ? a.toUpperCase().includes('ADMIN') : (a?.authority || '').toUpperCase().includes('ADMIN')))) return true;
+                } else if (typeof auth === 'string') {
+                    if (auth.toUpperCase().includes('ADMIN')) return true;
+                }
+
+                // 3) single role fields
+                const single = decoded?.role || decoded?.rolesString || decoded?.roleName;
+                if (typeof single === 'string' && single.toUpperCase().includes('ADMIN')) return true;
+
+                // 4) inspect any string-like claim keys as a fallback
+                for (const k of Object.keys(decoded || {})) {
+                    const v = decoded[k];
+                    if (typeof v === 'string' && v.toUpperCase().includes('ADMIN')) return true;
+                }
+
+                return false;
+            };
+
+            setIsAdmin(containsAdmin());
+            setCurrentUserName(decoded.sub ?? decoded.subject ?? null);
+        } catch (e) {
+            console.error("Token decoding failed", e);
         }
     }, []);
 
@@ -102,7 +128,7 @@ export const Dashboard = () => {
                 {activeTab === 'teams' && <TeamsView isAdmin={isAdmin} />}
                 {activeTab === 'seasons' && <SeasonsView isAdmin={isAdmin} />}
                 {activeTab === 'courses' && <CourseManager isAdmin={isAdmin} />}
-                {activeTab === 'scoreCards' && <FlightsView />}
+                {activeTab === 'scoreCards' && <FlightsView isAdmin={isAdmin} currentUserName={currentUserName} />}
             </main>
         </div>
     );

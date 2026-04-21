@@ -21,6 +21,7 @@ import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import com.pinewoods.score.tracker.services.course.CourseService;
 import com.pinewoods.score.tracker.services.flight.FlightService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
+import io.micrometer.common.KeyValues;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -324,6 +325,13 @@ public class TournamentService {
 
         calculatedFlightCache.computeIfAbsent(tournamentId, k -> new ArrayList<>());
         calculatedFlightCache.get(tournamentId).add(calculatedFlight);
+    }
+
+    public List<TournamentDTO> getAllActiveTournaments() {
+        return tournamentRepo.findAll().stream()
+            .filter(t -> !t.isFinished())
+            .map(Tournament::toDTO)
+            .toList();
     }
 
     // ============== Import and export ===============
