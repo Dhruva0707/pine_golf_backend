@@ -90,7 +90,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
 
         // Define allowed methods and headers explicitly
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
         // This MUST be true for the frontend to send JWTs or cookies

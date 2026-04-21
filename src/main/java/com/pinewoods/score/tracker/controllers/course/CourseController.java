@@ -85,16 +85,15 @@ public class CourseController {
         return ResponseEntity.ok(courseService.updateCourse(name, dto));
     }
 
-    @Operation(
-            summary = "Delete a course",
-            description = "Deletes a course by name",
-            responses = {
-                    @ApiResponse(responseCode = "204", description = "Course deleted"),
-                    @ApiResponse(responseCode = "404", description = "Course not found")
-            }
-    )
-
     // ===================Delete course ===================
+    @Operation(
+        summary = "Delete a course",
+        description = "Deletes a course by name",
+        responses = {
+            @ApiResponse(responseCode = "204", description = "Course deleted"),
+            @ApiResponse(responseCode = "404", description = "Course not found")
+        }
+    )
     @DeleteMapping("/{name}")
     public ResponseEntity<Void> deleteCourse(@PathVariable String name) {
         courseService.deleteCourse(name);

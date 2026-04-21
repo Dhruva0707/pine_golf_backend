@@ -54,8 +54,8 @@ public class SeasonService {
      * @param name name of the season
      * @return season dto containing all the information
      */
-    public Season getSeasonByName(String name) {
-        return seasonRepo.findByName(name)
+    public Season getSeasonById(Long id) {
+        return seasonRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Season not found"));
     }
 

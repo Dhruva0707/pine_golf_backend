@@ -39,8 +39,8 @@ export const TeamsView = ({ isAdmin }: { isAdmin: boolean }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {teams.map(team => (
-                    <div key={team.id} className="bg-white p-6 rounded-3xl border border-latte-crust shadow-sm flex items-center justify-between group">
+                {teams.map((team, idx) => (
+                    <div key={team?.id ?? `team-${idx}`} className="bg-white p-6 rounded-3xl border border-latte-crust shadow-sm flex items-center justify-between group">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-latte-mauve/10 text-latte-mauve rounded-2xl flex items-center justify-center">
                                 <LayoutDashboard size={24} />

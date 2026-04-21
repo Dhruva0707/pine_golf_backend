@@ -5,16 +5,15 @@ import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtiliti
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
-import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
 import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
+import com.pinewoods.score.tracker.services.course.CourseService;
 import com.pinewoods.score.tracker.services.scoring.IScoringStrategy;
 import com.pinewoods.score.tracker.services.scoring.ScoringStrategyFactory;
 import com.pinewoods.score.tracker.services.tournament.TournamentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,6 +46,8 @@ public class TournamentController {
     private final PlayerRepository playerRepository;
     private final CourseRepository courseRepository;
 
+    private final CourseService courseService;
+
     @PostMapping("/start")
     @Operation(summary = "Create and start a new tournament session",
             description = "Initializes the scoring strategy and parks it in memory until the tournament is finalized.")
@@ -61,12 +62,11 @@ public class TournamentController {
         // Build the strategy instance from request data
         IScoringStrategy strategy = strategyFactory.getStrategy(
                 request.getStrategyType(),
-                course.getPars(),
-                course.getIndexes(),
+                course,
                 request.getPointsMap(),
                 request.getHandicapMultiplier(),
-                request.getCourseName(),
-                playerRepository
+                playerRepository,
+                courseService
         );
 
         Tournament tournament = tournamentService.createTournament(
@@ -78,19 +78,6 @@ public class TournamentController {
         TournamentDTO tournamentDTO = tournament.toDTO();
         URI resultUri = ControllerUtilities.createResourceURI("name", tournamentDTO.name());
         return ResponseEntity.created(resultUri).body(tournamentDTO);
-    }
-
-    @PostMapping("/{id}/flights")
-    @Operation(summary = "Add a scorecard",
-            description = """
-                    Accepts a list of player scorecards for a single flight.
-                    Calculates scores immediately using the active strategy.
-                    """)
-    public ResponseEntity<Void> addFlight(
-            @Parameter(description = "ID of the active tournament") @PathVariable Long id,
-            @Valid @RequestBody List<ScoreCardDTO> cards) {
-        tournamentService.addScorecards(id, cards);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/end")
@@ -116,6 +103,12 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getTournamentBySeasonAndName(seasonName, tournamentName).toDTO());
     }
 
+    @GetMapping("")
+    @Operation(summary = "Get all active tournaments")
+    public ResponseEntity<List<TournamentDTO>> getAllActiveTournaments() {
+        return ResponseEntity.ok(tournamentService.getAllActiveTournaments());
+    }
+
     @GetMapping("/{seasonName}/{tournamentName}/leaderBoard")
     @Operation(summary = "Get the current tournament's leaderboard")
     public ResponseEntity<List<FlightScoreDTO>> getLeaderBoard(@PathVariable("tournamentName") String tournamentName,
@@ -128,13 +121,6 @@ public class TournamentController {
     public ResponseEntity<List<Integer>> getTournamentExpectedScore(@PathVariable("tournamentId") Long tournamentId,
                                                                     @PathVariable("playerId") Long playerId) {
         return ResponseEntity.ok(tournamentService.getDefaultScores(tournamentId, playerId));
-    }
-
-    @GetMapping("/{tournamentId}/{handicap}/handicapScore")
-    @Operation(summary = "Get the effective net par score for a given handicap in a tournament")
-    public ResponseEntity<List<Integer>> getTournamentExpectedScoreByHandicap(@PathVariable("tournamentId") Long tournamentId,
-                                                                              @PathVariable("handicap") double handicap) {
-        return ResponseEntity.ok(tournamentService.getDefaultScoresByHandicap(tournamentId, handicap));
     }
 
     // ------------ Delete Tournament -----------

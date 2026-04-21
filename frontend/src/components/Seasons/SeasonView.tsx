@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { AddTournamentModal } from './AddTournamentModal';
-import { FlightManagerModal } from '../Flights/AddFlightModal';
 
 interface TeamStandingDTO {
     teamName: string;
@@ -36,7 +35,6 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [standings, setStandings] = useState<TeamStandingDTO[]>([]);
     const [isTourneyModalOpen, setIsTourneyModalOpen] = useState(false);
-    const [activeTourneyForFlights, setActiveTourneyForFlights] = useState<any | null>(null);
     const [expandedFlights, setExpandedFlights] = useState<Record<number, boolean>>({});
     const [leaderboardTournament, setLeaderboardTournament] = useState<any | null>(null);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntryDTO[] | null>(null);
@@ -79,23 +77,32 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         } catch (err) { console.error("Failed to fetch players", err); }
     };
 
-    const PlayerName = ({ id }: { id: string | number }) => {
-        const [name, setName] = useState<string>(`ID: ${id}`);
+    // Map of playerId -> playerName to avoid many per-player requests when showing awards
+    const [awardPlayerMap, setAwardPlayerMap] = useState<Record<number, string>>({});
 
-        useEffect(() => {
-            const fetchName = async () => {
-                try {
-                    // Calling your specific /players/id/{id} endpoint
-                    const res = await api.get(`/players/id/${id}`);
-                    setName(res.data.name);
-                } catch (err) {
-                    console.error(`Failed to fetch name for player ${id}`, err);
-                }
-            };
-            fetchName();
-        }, [id]);
+    const resolveAwardPlayerNames = async (tournamentsList: any[]) => {
+        // collect all player ids referenced in awards
+        const ids = new Set<number>();
+        tournamentsList.forEach(t => {
+            if (t?.awards) {
+                Object.keys(t.awards).forEach(k => {
+                    const num = Number(k);
+                    if (!isNaN(num)) ids.add(num);
+                });
+            }
+        });
 
-        return <span>{name}</span>;
+        if (ids.size === 0) return;
+
+        try {
+            const res = await api.get('/players');
+            const allPlayers = Array.isArray(res.data) ? res.data : [];
+            const map: Record<number, string> = {};
+            allPlayers.forEach((p: any) => { if (p?.id) map[Number(p.id)] = p.name; });
+            setAwardPlayerMap(map);
+        } catch (e) {
+            console.warn('Failed to load players for award name resolution', e);
+        }
     };
 
     const fetchDataForSeason = async () => {
@@ -106,6 +113,8 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
             ]);
             setTournaments(tourneyRes.data);
             setStandings(standingsRes.data);
+            // resolve award player names in batch
+            resolveAwardPlayerNames(tourneyRes.data || []);
         }
     };
 
@@ -215,16 +224,8 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         }
     };
 
-    const handleOpenTournamentManager = (tournament: any) => {
-        setLeaderboardTournament(null);
-        setLeaderboard(null);
-        setLeaderboardError(null);
-        setLeaderboardLoading(false);
-        setActiveTourneyForFlights({ ...tournament, seasonName: selectedSeason });
-    };
-
     const handleOpenLeaderboard = async (tournament: any) => {
-        setActiveTourneyForFlights(null);
+        // Open leaderboard for this tournament
         await loadLeaderboard({ ...tournament, seasonName: selectedSeason });
     };
 
@@ -233,15 +234,6 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
         setLeaderboard(null);
         setLeaderboardError(null);
         setLeaderboardLoading(false);
-    };
-
-    const handleFlightSaved = async () => {
-        const tournament = activeTourneyForFlights;
-        setActiveTourneyForFlights(null);
-        await fetchDataForSeason();
-        if (tournament) {
-            await loadLeaderboard({ ...tournament, seasonName: selectedSeason });
-        }
     };
 
     const handleEndTournament = async (tournament: any) => {
@@ -371,14 +363,18 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                             </div>
                                             {Object.entries(t.awards)
                                                 .sort((a, b) => (a[1] as number) - (b[1] as number))
-                                                .map(([playerId, rank]) => (
-                                                    <div
-                                                        key={playerId}
-                                                        className="bg-white px-3 py-1 rounded-full border border-latte-yellow/30 text-xs font-bold shadow-sm flex items-center gap-1"
-                                                    >
-                                                        <PlayerName id={playerId} />, Rank {String(rank)}
-                                                    </div>
-                                                ))
+                                                .map(([playerId, rank]) => {
+                                                    const pid = Number(playerId);
+                                                    const pname = awardPlayerMap[pid] ?? `ID:${playerId}`;
+                                                    return (
+                                                        <div
+                                                            key={playerId}
+                                                            className="bg-white px-3 py-1 rounded-full border border-latte-yellow/30 text-xs font-bold shadow-sm flex items-center gap-1"
+                                                        >
+                                                            <span>{pname}</span>, Rank {String(rank)}
+                                                        </div>
+                                                    );
+                                                })
                                             }
                                         </div>
                                     )}
@@ -395,15 +391,12 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => setExpandedFlights(prev => ({ ...prev, [t.id]: !prev[t.id] }))} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
-                                                <ChevronRight size={16} className={`${expandedFlights[t.id] ? 'rotate-90' : ''} transition-transform`} /> View Flights
+                                                <ChevronRight size={16} className={`${expandedFlights[t.id] ? 'rotate-90' : ''} transition-transform`} /> ScoreCards
                                             </button>
                                             {canManageTournament(t) && (
                                                 <>
                                                     <button onClick={() => handleOpenLeaderboard(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
                                                         <Trophy size={16} /> Leaderboard
-                                                    </button>
-                                                    <button onClick={() => handleOpenTournamentManager(t)} className="px-4 py-2 text-sm font-bold bg-latte-base rounded-xl hover:bg-latte-crust flex items-center gap-2">
-                                                        <Plus size={16} /> Add Flight
                                                     </button>
                                                     {isAdmin && (
                                                         <button onClick={() => handleEndTournament(t)} className="px-4 py-2 text-sm font-bold bg-latte-green text-white rounded-xl hover:brightness-110 flex items-center gap-2">
@@ -477,7 +470,7 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                                     {expandedFlights[t.id] && (
                                         <div className="px-5 pb-5">
                                             {(!t.flights || t.flights.length === 0) ? (
-                                                <div className="text-sm text-latte-subtext font-bold bg-latte-mantle rounded-xl p-4">No flights recorded yet.</div>
+                                                <div className="text-sm text-latte-subtext font-bold bg-latte-mantle rounded-xl p-4">No Scores recorded yet.</div>
                                             ) : (
                                                 <div className="space-y-4">
                                                     {t.flights.map((fd: any, fIdx: number) => (
@@ -530,7 +523,6 @@ export const SeasonsView = ({ isAdmin }: { isAdmin: boolean }) => {
                 />
             )}
             <AddTournamentModal isOpen={isTourneyModalOpen} onClose={() => setIsTourneyModalOpen(false)} seasonName={selectedSeason || ''} onSuccess={fetchDataForSeason} />
-            <FlightManagerModal isOpen={!!activeTourneyForFlights} onClose={handleFlightSaved} tournament={activeTourneyForFlights} />
         </div>
     );
 };

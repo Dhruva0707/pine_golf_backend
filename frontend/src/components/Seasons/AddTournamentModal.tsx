@@ -211,68 +211,6 @@ export const AddTournamentModal = ({ isOpen, onClose, seasonName, onSuccess }: A
                         </div>
                     </div>
 
-                    {/* Leaderboard (Existing Tournament) */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="text-xs font-black uppercase tracking-widest text-latte-subtext ml-1">Tournament Leaderboard</h4>
-                                <p className="text-[10px] text-latte-subtext ml-1">Looks up an existing tournament in this season by the entered name.</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const willOpen = !showLeaderboard;
-                                    setShowLeaderboard(willOpen);
-                                    if (willOpen && name) {
-                                        fetchLeaderBoard();
-                                    }
-                                }}
-                                disabled={!name}
-                                className={`px-4 py-2 text-sm font-bold rounded-xl flex items-center gap-2 border ${!name ? 'opacity-50 cursor-not-allowed bg-latte-mantle text-latte-subtext' : 'bg-latte-base hover:bg-latte-crust'}`}
-                            >
-                                <ChevronRight size={16} className={`${showLeaderboard ? 'rotate-90' : ''} transition-transform`} /> View Leaderboard
-                            </button>
-                        </div>
-
-                        {showLeaderboard && (
-                            <div className="border border-latte-crust rounded-2xl overflow-hidden">
-                                <div className="bg-latte-base px-4 py-2 flex items-center gap-2 text-latte-subtext text-xs uppercase font-black">
-                                    <Trophy size={14} /> Leaderboard for: <span className="text-latte-text">{name}</span>
-                                </div>
-                                <div className="p-4">
-                                    {lbLoading && (
-                                        <div className="text-sm text-latte-subtext font-bold">Loading...</div>
-                                    )}
-                                    {lbError && (
-                                        <div className="text-sm text-latte-red font-bold">{lbError}</div>
-                                    )}
-                                    {!lbLoading && !lbError && (
-                                        leaderboard && leaderboard.length > 0 ? (
-                                            <>
-                                                <div className="grid grid-cols-12 text-xs font-black text-latte-subtext uppercase mb-2">
-                                                    <div className="col-span-6">Player</div>
-                                                    <div className="col-span-3 text-center">Score</div>
-                                                    <div className="col-span-3 text-center">Birdies</div>
-                                                </div>
-                                                <div className="divide-y divide-latte-crust">
-                                                    {leaderboard.map((lb: any, i: number) => (
-                                                        <div key={i} className="grid grid-cols-12 py-2 items-center">
-                                                            <div className="col-span-6 font-bold text-latte-text">{lb.playerName}</div>
-                                                            <div className="col-span-3 text-center font-black text-latte-mauve">{lb.score}</div>
-                                                            <div className="col-span-3 text-center text-latte-subtext">{lb.birdies}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="text-sm text-latte-subtext font-bold">No entries yet.</div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     <button type="submit" className="w-full py-5 bg-latte-mauve text-white rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all text-lg uppercase tracking-widest">
                         Initialize Tournament
                     </button>

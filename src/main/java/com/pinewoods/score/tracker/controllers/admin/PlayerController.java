@@ -4,7 +4,9 @@ import com.pinewoods.score.tracker.controllers.admin.utilities.ControllerUtiliti
 import com.pinewoods.score.tracker.dto.admin.UpdatePlayerRequest;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.dto.flight.FlightDTO;
+import com.pinewoods.score.tracker.entities.course.CourseHandicap;
 import com.pinewoods.score.tracker.services.admin.PlayerService;
+import com.pinewoods.score.tracker.services.course.CourseService;
 import java.net.URI;
 import java.util.List;
 
@@ -33,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlayerController {
 
     PlayerService playerService;
+    CourseService courseService;
 
-    public PlayerController(PlayerService playerService) {
+    public PlayerController(PlayerService playerService, CourseService courseService) {
         this.playerService = playerService;
+        this.courseService = courseService;
     }
 
     // -------- Create Methods --------
@@ -89,6 +93,15 @@ public class PlayerController {
         return ResponseEntity.ok(result);
     }
 
+    @Operation(summary = "Get player's handicap for a course",
+        description = "Retrieves the handicap for a specific player and course.",
+        security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/{playerId}/{courseId}/handicap")
+    public ResponseEntity<CourseHandicap> getCourseHandicap(@PathVariable("playerId") Long playerId,
+        @PathVariable("courseId") Long courseId) {
+        return ResponseEntity.ok(courseService.getCourseHandicap(playerId, courseId));
+    }
+
     // -------- Update Methods --------
 
     @Operation(
@@ -120,6 +133,13 @@ public class PlayerController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/{playerId}/{courseId}/handicap")
+    public ResponseEntity<Void> updateCourseHandicap(@PathVariable Long playerId,
+        @PathVariable Long courseId,
+        @RequestBody double handicap) {
+        courseService.updatePlayerHandicap(courseId, playerId, handicap);
+        return ResponseEntity.ok().build();
+    }
     // -------- Delete Methods --------
 
     @Operation(
