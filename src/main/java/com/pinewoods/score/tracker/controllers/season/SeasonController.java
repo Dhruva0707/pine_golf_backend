@@ -58,8 +58,8 @@ public class SeasonController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get details about a season")
-    ResponseEntity<SeasonDTO> getSeason(@PathVariable("id") String seasonName) {
-        return ResponseEntity.ok(seasonService.getSeasonByName(seasonName).toDto());
+    ResponseEntity<SeasonDTO> getSeason(@PathVariable("id") Long seasonId) {
+        return ResponseEntity.ok(seasonService.getSeasonById(seasonId).toDto());
     }
 
     @GetMapping("/{id}/tournaments")

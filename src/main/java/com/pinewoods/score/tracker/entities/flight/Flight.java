@@ -38,6 +38,6 @@ public class Flight {
                     .toList();
         }
 
-        return new FlightDTO(date, scoreDTOs);
+        return new FlightDTO(date, scoreDTOs, id);
     }
 }

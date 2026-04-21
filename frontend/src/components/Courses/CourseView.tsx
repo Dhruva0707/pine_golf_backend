@@ -98,36 +98,39 @@ export const CourseManager = ({ isAdmin }: CourseManagerProps) => {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setExpandedCourse(expandedCourse === course.name ? null : course.name)}
-                                        className="p-2 text-latte-subtext hover:bg-latte-base rounded-xl transition-all"
-                                        title="View Details"
-                                    >
-                                        {expandedCourse === course.name ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
-                                    </button>
+                                    {/* Only show expand/collapse to admins */}
                                     {isAdmin && (
                                         <>
                                             <button
-                                                onClick={() => handleEdit(course)}
-                                                className="p-2 text-latte-mauve hover:bg-latte-mauve/10 rounded-xl transition-all"
-                                                title="Edit Course"
+                                                onClick={() => setExpandedCourse(expandedCourse === course.name ? null : course.name)}
+                                                className="p-2 text-latte-subtext hover:bg-latte-base rounded-xl transition-all"
+                                                title="View Details"
                                             >
-                                                <Edit3 size={18} />
+                                                {expandedCourse === course.name ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
                                             </button>
-                                            <button
-                                                onClick={() => deleteCourse(course.name)}
-                                                className="p-2 text-latte-red hover:bg-latte-red/10 rounded-xl transition-all"
-                                                title="Delete Course"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => handleEdit(course)}
+                                                    className="p-2 text-latte-mauve hover:bg-latte-mauve/10 rounded-xl transition-all"
+                                                    title="Edit Course"
+                                                >
+                                                    <Edit3 size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteCourse(course.name)}
+                                                    className="p-2 text-latte-red hover:bg-latte-red/10 rounded-xl transition-all"
+                                                    title="Delete Course"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </>
                                         </>
                                     )}
                                 </div>
                             </div>
 
                             {/* --- EXPANDABLE HOLE DATA GRID --- */}
-                            {expandedCourse === course.name && (
+                            {isAdmin && expandedCourse === course.name && (
                                 <div className="px-6 pb-6 pt-2 border-t border-latte-base bg-latte-mantle/30 animate-in slide-in-from-top-2">
                                     <div className="grid grid-cols-6 md:grid-cols-9 lg:grid-cols-18 gap-2 mt-4">
                                         {course.pars.map((par: number, i: number) => (
@@ -141,6 +144,18 @@ export const CourseManager = ({ isAdmin }: CourseManagerProps) => {
                                                 </div>
                                             </div>
                                         ))}
+
+                                        {/* Also show explicit slope and course rating in expanded area for clarity */}
+                                        <div className="col-span-6 md:col-span-9 lg:col-span-18 mt-4 flex gap-4">
+                                            <div className="bg-white p-4 rounded-2xl border border-latte-crust w-full">
+                                                <div className="text-xs font-black text-latte-subtext uppercase">Slope Rating</div>
+                                                <div className="text-2xl font-black text-latte-text">{typeof course.slopeRating === 'number' ? course.slopeRating : '—'}</div>
+                                            </div>
+                                            <div className="bg-white p-4 rounded-2xl border border-latte-crust w-full">
+                                                <div className="text-xs font-black text-latte-subtext uppercase">Course Rating</div>
+                                                <div className="text-2xl font-black text-latte-text">{typeof course.courseRating === 'number' ? course.courseRating : '—'}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -161,3 +176,4 @@ export const CourseManager = ({ isAdmin }: CourseManagerProps) => {
         </div>
     );
 };
+

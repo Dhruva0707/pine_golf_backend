@@ -1,10 +1,13 @@
 package com.pinewoods.score.tracker.services.scoring;
 
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
+import com.pinewoods.score.tracker.dao.course.CourseHandicapRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
-import com.pinewoods.score.tracker.dto.scoring.ScoreCardDTO;
+import com.pinewoods.score.tracker.entities.admin.Player;
+import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
+import com.pinewoods.score.tracker.services.course.CourseService;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -14,48 +17,48 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
 
     final Map<Integer, Integer> pointsMap;
     PlayerRepository playerRepo;
+    final List<Integer> pars;
+    final List<Integer> indexes;
 
-    public StablefordScoringStrategy(List<Integer> pars, List<Integer> indexes,
-                                     Map<Integer, Integer> pointsMap, double handicapMultiplier, String courseName,
-                                     PlayerRepository playerRepo) {
+    public StablefordScoringStrategy(Course course,
+                                     Map<Integer, Integer> pointsMap, double handicapMultiplier,
+                                     PlayerRepository playerRepo, CourseService courseService) {
 
         super(handicapMultiplier);
 
-        if (pars.size() != 18 || indexes.size() != 18) {
-            throw new IllegalArgumentException("Pars and indexes must be of length 18");
-        }
-
-        this.pars = pars;
-        this.indexes = indexes;
+        this.course = course;
         this.pointsMap = pointsMap;
         this.playerRepo = playerRepo;
-        this.courseName = courseName;
+        this.courseService = courseService;
+        this.pars = course.getPars();
+        this.indexes = course.getIndexes();
     }
 
     @Override
-    public Flight calculateScores(List<ScoreCardDTO> cards) {
-        Flight flight = Flight.builder()
+    public Flight calculateScores(Flight flight) {
+        Flight calculatedFlight = Flight.builder()
                 .date(new Date())
                 .build();
 
-        for (ScoreCardDTO card : cards) {
-            PlayerDTO player = card.player();
-            int handicap = (int) Math.round(player.handicap() * handicapMultiplier);
+        for (FlightScore card : flight.getFlightScores()) {
+            Player player = card.getPlayer();
+            PlayerDTO playerDTO = player.toDTO();
+            int handicap = (int) Math.round(getCourseHandicap(player.getId(), course.getId()) * handicapMultiplier);
 
             // Perform the handicap/par/index math we discussed
-            int totalPoints = calculateScore(card.holeScores(), handicap);
-            int birdies = countBirdies(card.holeScores());
+            int totalPoints = calculateScore(card.getHoleScores(), handicap);
+            int birdies = countBirdies(card.getHoleScores());
 
             FlightScore fs = FlightScore.builder()
-                    .player(playerRepo.findByName(player.name()).orElseThrow())
+                    .player(playerRepo.findByName(playerDTO.name()).orElseThrow())
                     .score(totalPoints)
                     .birdies(birdies)
-                    .flight(flight) // Set back-reference
+                    .flight(calculatedFlight) // Set back-reference
                     .build();
 
-            flight.getFlightScores().add(fs);
+            calculatedFlight.getFlightScores().add(fs);
         }
-        return flight;
+        return calculatedFlight;
     }
 
     @Override
@@ -68,8 +71,8 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
             List<Integer> scores,
             @NotNull double hcp) {
         int totalPoints = 0;
-        int minDiff = pointsMap.keySet().stream().min(Integer::compare).orElse(0);
-        int maxDiff = pointsMap.keySet().stream().max(Integer::compare).orElse(0);
+        int minDiff = pointsMap.keySet().stream().min(Integer::compare).orElse(-2);
+        int maxDiff = pointsMap.keySet().stream().max(Integer::compare).orElse(2);
         for (int i = 0; i < 18; i++) {
             int par = pars.get(i);
             int index = indexes.get(i);
