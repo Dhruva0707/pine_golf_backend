@@ -1,10 +1,8 @@
 package com.pinewoods.score.tracker.services.scoring;
 
 import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
-import com.pinewoods.score.tracker.dao.course.CourseHandicapRepository;
 import com.pinewoods.score.tracker.dto.admin.PlayerDTO;
 import com.pinewoods.score.tracker.entities.admin.Player;
-import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.flight.Flight;
 import com.pinewoods.score.tracker.entities.flight.FlightScore;
 import com.pinewoods.score.tracker.services.course.CourseService;
@@ -17,21 +15,16 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
 
     final Map<Integer, Integer> pointsMap;
     PlayerRepository playerRepo;
-    final List<Integer> pars;
-    final List<Integer> indexes;
 
-    public StablefordScoringStrategy(Course course,
+    public StablefordScoringStrategy(Long courseId,
                                      Map<Integer, Integer> pointsMap, double handicapMultiplier,
                                      PlayerRepository playerRepo, CourseService courseService) {
 
         super(handicapMultiplier);
-
-        this.course = course;
         this.pointsMap = pointsMap;
         this.playerRepo = playerRepo;
         this.courseService = courseService;
-        this.pars = course.getPars();
-        this.indexes = course.getIndexes();
+        this.courseId = courseId;
     }
 
     @Override
@@ -43,7 +36,7 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
         for (FlightScore card : flight.getFlightScores()) {
             Player player = card.getPlayer();
             PlayerDTO playerDTO = player.toDTO();
-            int handicap = (int) Math.round(getCourseHandicap(player.getId(), course.getId()) * handicapMultiplier);
+            int handicap = (int) Math.round(getCourseHandicap(player.getId(), getCourse().getId()) * handicapMultiplier);
 
             // Perform the handicap/par/index math we discussed
             int totalPoints = calculateScore(card.getHoleScores(), handicap);
@@ -70,6 +63,8 @@ public class StablefordScoringStrategy extends BaseScoringStrategy {
             @NotNull @Size(min = 18, max = 18, message = "Exactly 18 hole scores must be provided.")
             List<Integer> scores,
             @NotNull double hcp) {
+        List<Integer> pars = getCourse().getPars();
+        List<Integer> indexes = getCourse().getIndexes();
         int totalPoints = 0;
         int minDiff = pointsMap.keySet().stream().min(Integer::compare).orElse(-2);
         int maxDiff = pointsMap.keySet().stream().max(Integer::compare).orElse(2);

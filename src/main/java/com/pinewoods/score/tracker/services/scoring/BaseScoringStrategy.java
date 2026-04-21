@@ -1,6 +1,6 @@
 package com.pinewoods.score.tracker.services.scoring;
 
-import com.pinewoods.score.tracker.entities.course.Course;
+import com.pinewoods.score.tracker.dto.course.CourseDTO;
 import com.pinewoods.score.tracker.services.course.CourseService;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -10,7 +10,7 @@ import java.util.List;
 
 public abstract class BaseScoringStrategy implements IScoringStrategy {
     @Getter
-    Course course;
+    Long courseId;
     double handicapMultiplier;
     CourseService courseService;
 
@@ -20,7 +20,7 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
 
     @Override
     public String getCourseName() {
-        return course.getName();
+        return getCourse().getName();
     }
 
     @Override
@@ -29,7 +29,7 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
             List<Integer> scores) {
         int birdies = 0;
         for (int i = 0; i < 18; i++) {
-            if (scores.get(i) - course.getPars().get(i) < 0) {
+            if (scores.get(i) - getCourse().getPars().get(i) < 0) {
                 birdies++;
             }
         }
@@ -43,5 +43,9 @@ public abstract class BaseScoringStrategy implements IScoringStrategy {
 
     protected double getCourseHandicap(Long playerId, Long courseId) {
         return courseService.getCourseHandicap(playerId, courseId).getHandicap();
+    }
+
+    protected CourseDTO getCourse() {
+        return courseService.getCourse(courseId);
     }
 }

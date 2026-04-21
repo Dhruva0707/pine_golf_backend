@@ -184,33 +184,13 @@ export const FlightsView = ({ isAdmin, currentUserName }: { isAdmin: boolean; cu
         } catch (err) { alert("Error saving flight."); }
     };
 
-    // When switching to add view, default scores for any new players and optionally add current user
+    // When switching to Add view, clear any prefilled rows so user must explicitly choose players
     useEffect(() => {
         if (view === 'add') {
-            if (flightRows.length === 0 && currentUserName) {
-                const current = players.find(p => p.name === currentUserName);
-                if (current) {
-                    void (async () => {
-                        const expected = await getExpectedScoresForPlayer(current, courseName);
-                        setFlightRows([{ player: current, expected, actual: Array(18).fill(null) }]);
-                    })();
-                }
-            }
+            setFlightRows([]);
+            setSelectedPlayerToAdd('');
         }
-    }, [view, courseName, flightRows.length, currentUserName, players]);
-
-    // If players or current user info arrives later, ensure default target player in Add view
-    useEffect(() => {
-        if (view === 'add' && flightRows.length === 0 && currentUserName) {
-            const current = players.find(p => p.name === currentUserName);
-            if (current) {
-                void (async () => {
-                    const expected = await getExpectedScoresForPlayer(current, courseName);
-                    setFlightRows([{ player: current, expected, actual: Array(18).fill(null) }]);
-                })();
-            }
-        }
-    }, [players, currentUserName]);
+    }, [view]);
 
     // Helpers for multi-player add view
     const addPlayerToFlight = async (name: string) => {

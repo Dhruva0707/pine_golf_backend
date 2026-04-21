@@ -85,6 +85,11 @@ public class CourseService {
                 .orElseThrow(() -> new RuntimeException("Course not found"));
     }
 
+    public CourseDTO getCourse(Long id) {
+        return courseRepository.findById(id).map(Course::toDTO)
+                .orElseThrow(() -> new RuntimeException("Course not found"));
+    }
+
     public CourseHandicap updatePlayerHandicap(Long courseId, Long playerId, double handicap) {
         CourseHandicap.Id id = new CourseHandicap.Id(playerId, courseId);
         CourseHandicap courseHandicap = CourseHandicap.builder()

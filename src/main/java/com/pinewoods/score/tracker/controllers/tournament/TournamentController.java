@@ -6,7 +6,6 @@ import com.pinewoods.score.tracker.dao.admin.PlayerRepository;
 import com.pinewoods.score.tracker.dao.course.CourseRepository;
 import com.pinewoods.score.tracker.dto.flight.FlightScoreDTO;
 import com.pinewoods.score.tracker.dto.tournament.TournamentDTO;
-import com.pinewoods.score.tracker.entities.course.Course;
 import com.pinewoods.score.tracker.entities.tournament.Tournament;
 import com.pinewoods.score.tracker.exceptions.ResourceNotFoundException;
 import com.pinewoods.score.tracker.services.course.CourseService;
@@ -56,13 +55,13 @@ public class TournamentController {
             @ApiResponse(responseCode = "404", description = "Season not found")
     })
     public ResponseEntity<TournamentDTO> startTournament(@Valid @RequestBody TournamentCreateRequest request) {
-        Course course = courseRepository.findByName(request.courseName)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+        Long courseId = courseRepository.findByName(request.courseName)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found")).getId();
 
         // Build the strategy instance from request data
         IScoringStrategy strategy = strategyFactory.getStrategy(
                 request.getStrategyType(),
-                course,
+                courseId,
                 request.getPointsMap(),
                 request.getHandicapMultiplier(),
                 playerRepository,

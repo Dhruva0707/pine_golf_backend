@@ -10,13 +10,13 @@ import java.util.Map;
 
 @Component
 public class ScoringStrategyFactory {
-    public IScoringStrategy getStrategy(String type, Course course,
+    public IScoringStrategy getStrategy(String type, Long courseId,
                                         Map<Integer, Integer> pointsMap, double handicapMultiplier,
                                         PlayerRepository playerRepository, CourseService courseService) {
         return switch (type.trim().toUpperCase()) { // Added .trim()
-            case "STABLEFORD" -> new StablefordScoringStrategy(course, pointsMap, handicapMultiplier,
+            case "STABLEFORD" -> new StablefordScoringStrategy(courseId, pointsMap, handicapMultiplier,
                     playerRepository, courseService);
-            case "STROKEPLAY" -> new StrokeplayScoringStrategy(course, playerRepository, handicapMultiplier, courseService);
+            case "STROKEPLAY" -> new StrokeplayScoringStrategy(courseId, playerRepository, handicapMultiplier, courseService);
             default -> throw new IllegalArgumentException("Unsupported scoring strategy: " + type);
         };
     }

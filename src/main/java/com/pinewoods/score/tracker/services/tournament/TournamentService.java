@@ -43,7 +43,6 @@ public class TournamentService {
     private final PlayerRepository playerRepo;
     private final TeamStandingRepository standingRepo;
     private final CourseRepository courseRepo;
-    private final CourseService courseService;
     private final Map<Long, IScoringStrategy> activeStrategies = new ConcurrentHashMap<>();
     private final Map<Long, List<Flight>> calculatedFlightCache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
