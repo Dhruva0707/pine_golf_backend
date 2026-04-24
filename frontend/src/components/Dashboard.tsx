@@ -87,8 +87,6 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                <span className="font-black text-lg leading-tight tracking-tight"> Welcome, {currentUserName} </span>
-
                 <button
                     onClick={logout}
                     className="flex items-center gap-2 text-latte-red font-bold text-sm hover:bg-latte-red/10 px-4 py-2 rounded-xl transition-all"
@@ -96,6 +94,8 @@ export const Dashboard = () => {
                     <LogOut size={18} /> Logout
                 </button>
             </header>
+
+            <span className="font-black text-lg leading-tight tracking-tight"> Welcome, {currentUserName} </span>
 
             {/* Tab Switchers - moved below the main header so it's on its own row */}
             {/* Center the tabs within their row and align with main content padding */}
