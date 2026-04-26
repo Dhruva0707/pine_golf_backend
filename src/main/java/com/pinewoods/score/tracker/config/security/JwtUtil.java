@@ -24,7 +24,7 @@ public class JwtUtil {private final SecretKey SECRET = Keys.hmacShaKeyFor("bm]hX
                 .subject(userDetails.getUsername())
                 .claim("roles", userDetails.getAuthorities())
                 .issuedAt(now)
-                .expiration(Date.from(now.toInstant().plusSeconds(60 * 60))) // 1-hour validity
+                .expiration(Date.from(now.toInstant().plusSeconds(6*60 * 60))) // 1-hour validity
                 .signWith(SECRET, Jwts.SIG.HS256)
                 .compact();
     }

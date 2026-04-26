@@ -95,7 +95,9 @@ export const Dashboard = () => {
                 </button>
             </header>
 
-            <span className="font-black text-lg leading-tight tracking-tight"> Welcome, {currentUserName} </span>
+            <div className="max-w-7xl mx-auto w-full px-6 md:px-10">
+                <span className="block mt-4 font-black text-lg leading-tight tracking-tight"> Welcome, {currentUserName} </span>
+            </div>
 
             {/* Tab Switchers - moved below the main header so it's on its own row */}
             {/* Center the tabs within their row and align with main content padding */}
